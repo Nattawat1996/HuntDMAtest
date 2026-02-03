@@ -128,11 +128,11 @@ private:
 	uint64_t TypeNamePointer2 = 0x0;
 	EntityNameStruct TypeName;
 
-	const uint64_t HpOffset1 = 0x198;
-	const uint64_t HpOffset2 = 0x20;
-	const uint64_t HpOffset3 = 0xD0;
-	const uint64_t HpOffset4 = 0x78;
-	const uint64_t HpOffset5 = 0x58;
+	const uint64_t HpOffset1 = 0x50;  // Candidate B - Position 0x02838F5C
+	const uint64_t HpOffset2 = 0x78;  // Matches old HpOffset4
+	const uint64_t HpOffset3 = 0x68;
+	const uint64_t HpOffset4 = 0x40;
+	const uint64_t HpOffset5 = 0x58;  // Confirmed correct
 	uint64_t HpPointer1 = 0x0;
 	uint64_t HpPointer2 = 0x0;
 	uint64_t HpPointer3 = 0x0;
