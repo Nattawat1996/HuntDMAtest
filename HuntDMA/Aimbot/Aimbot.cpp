@@ -148,11 +148,8 @@ std::shared_ptr<CheatFunction> UpdateAimKey = std::make_shared<CheatFunction>(50
 	if (EnvironmentInstance->GetObjectCount() < 10)
 		return;
 	
-	// Check both keyboard and Makcu button
-	bool keyboardHeld = Keyboard::IsKeyDown(Configs.Aimbot.AimKey);
-	bool makcuHeld = Makcu::connected && Makcu::button_pressed(Configs.Aimbot.AimKey);
-	
-	AimKeyDown = (keyboardHeld || makcuHeld);
+	// Keyboard::IsKeyDown now merges DMA keyboard state with Makcu mouse buttons.
+	AimKeyDown = Keyboard::IsKeyDown(Configs.Aimbot.AimKey);
 });
 
 std::chrono::system_clock::time_point KmboxStart;

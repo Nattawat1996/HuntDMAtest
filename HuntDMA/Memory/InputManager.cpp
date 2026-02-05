@@ -2,6 +2,7 @@
 #include "InputManager.h"
 #include "Registry.h"
 #include "Memory/Memory.h"
+#include "Makcu.h"
 
 namespace Keyboard
 {
@@ -10,6 +11,31 @@ namespace Keyboard
 	uint8_t previous_state_bitmap[256 / 8]{ };
 	uint64_t win32kbase = 0;
 	int win_logon_pid = 0;
+
+	bool IsMouseVk(uint32_t virtual_key_code, int& makcuButton)
+	{
+		switch (virtual_key_code)
+		{
+		case VK_LBUTTON:
+			makcuButton = 1;
+			return true;
+		case VK_RBUTTON:
+			makcuButton = 2;
+			return true;
+		case VK_MBUTTON:
+			makcuButton = 3;
+			return true;
+		case VK_XBUTTON1:
+			makcuButton = 4;
+			return true;
+		case VK_XBUTTON2:
+			makcuButton = 5;
+			return true;
+		default:
+			makcuButton = 0;
+			return false;
+		}
+	}
 }
 
 bool Keyboard::InitKeyboard()
@@ -92,6 +118,23 @@ auto start = std::chrono::system_clock::now();
 
 bool Keyboard::IsKeyDown(uint32_t virtual_key_code)
 {
+	int makcuButton = 0;
+	if (IsMouseVk(virtual_key_code, makcuButton))
+	{
+		const bool makcuDown = Makcu::connected && Makcu::button_pressed(makcuButton);
+		if (gafAsyncKeyStateExport < 0x7FFFFFFFFFFF)
+			return makcuDown;
+
+		if (std::chrono::system_clock::now() - start > std::chrono::milliseconds(1))
+		{
+			UpdateKeys();
+			start = std::chrono::system_clock::now();
+		}
+
+		const bool dmaDown = (state_bitmap[(virtual_key_code * 2 / 8)] & 1 << virtual_key_code % 4 * 2) != 0;
+		return dmaDown || makcuDown;
+	}
+
 	if (gafAsyncKeyStateExport < 0x7FFFFFFFFFFF)
 		return false;
 	if (std::chrono::system_clock::now() - start > std::chrono::milliseconds(1))
