@@ -148,11 +148,25 @@ std::shared_ptr<CheatFunction> UpdateAimKey = std::make_shared<CheatFunction>(50
 	if (EnvironmentInstance->GetObjectCount() < 10)
 		return;
 	
-	// Check both keyboard and Makcu button
-	bool keyboardHeld = Keyboard::IsKeyDown(Configs.Aimbot.AimKey);
-	bool makcuHeld = Makcu::connected && Makcu::button_pressed(Configs.Aimbot.AimKey);
-	
-	AimKeyDown = (keyboardHeld || makcuHeld);
+	auto keyState = Keyboard::GetKeyStateInfo(Configs.Aimbot.AimKey);
+	AimKeyDown = keyState.combinedDown;
+
+	static bool prevCombined = false;
+	static bool prevDma = false;
+	static bool prevMakcu = false;
+	if (prevCombined != keyState.combinedDown || prevDma != keyState.dmaDown || prevMakcu != keyState.makcuDown)
+	{
+		LOG_INFO("[InputDiag] AimKey=0x%02X combined=%d dmaAvailable=%d dmaDown=%d makcuDown=%d",
+			Configs.Aimbot.AimKey,
+			keyState.combinedDown ? 1 : 0,
+			keyState.dmaAvailable ? 1 : 0,
+			keyState.dmaDown ? 1 : 0,
+			keyState.makcuDown ? 1 : 0);
+
+		prevCombined = keyState.combinedDown;
+		prevDma = keyState.dmaDown;
+		prevMakcu = keyState.makcuDown;
+	}
 });
 
 std::chrono::system_clock::time_point KmboxStart;

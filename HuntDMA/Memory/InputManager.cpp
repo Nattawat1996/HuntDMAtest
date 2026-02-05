@@ -2,6 +2,7 @@
 #include "InputManager.h"
 #include "Registry.h"
 #include "Memory/Memory.h"
+#include "Makcu.h"
 
 namespace Keyboard
 {
@@ -10,6 +11,36 @@ namespace Keyboard
 	uint8_t previous_state_bitmap[256 / 8]{ };
 	uint64_t win32kbase = 0;
 	int win_logon_pid = 0;
+
+	bool IsBitmapKeyDown(const uint8_t* bitmap, uint32_t virtual_key_code)
+	{
+		return (bitmap[(virtual_key_code * 2 / 8)] & 1 << virtual_key_code % 4 * 2) != 0;
+	}
+
+	bool IsMouseVk(uint32_t virtual_key_code, int& makcuButton)
+	{
+		switch (virtual_key_code)
+		{
+		case VK_LBUTTON:
+			makcuButton = 1;
+			return true;
+		case VK_RBUTTON:
+			makcuButton = 2;
+			return true;
+		case VK_MBUTTON:
+			makcuButton = 3;
+			return true;
+		case VK_XBUTTON1:
+			makcuButton = 4;
+			return true;
+		case VK_XBUTTON2:
+			makcuButton = 5;
+			return true;
+		default:
+			makcuButton = 0;
+			return false;
+		}
+	}
 }
 
 bool Keyboard::InitKeyboard()
@@ -90,14 +121,30 @@ void Keyboard::UpdateKeys()
 
 auto start = std::chrono::system_clock::now();
 
+Keyboard::KeyStateInfo Keyboard::GetKeyStateInfo(uint32_t virtual_key_code)
+{
+	KeyStateInfo info{};
+	int makcuButton = 0;
+	if (IsMouseVk(virtual_key_code, makcuButton))
+		info.makcuDown = Makcu::connected && Makcu::button_pressed(makcuButton);
+
+	if (gafAsyncKeyStateExport > 0x7FFFFFFFFFFF)
+	{
+		if (std::chrono::system_clock::now() - start > std::chrono::milliseconds(1))
+		{
+			UpdateKeys();
+			start = std::chrono::system_clock::now();
+		}
+
+		info.dmaAvailable = true;
+		info.dmaDown = IsBitmapKeyDown(state_bitmap, virtual_key_code);
+	}
+
+	info.combinedDown = info.dmaDown || info.makcuDown;
+	return info;
+}
+
 bool Keyboard::IsKeyDown(uint32_t virtual_key_code)
 {
-	if (gafAsyncKeyStateExport < 0x7FFFFFFFFFFF)
-		return false;
-	if (std::chrono::system_clock::now() - start > std::chrono::milliseconds(1))
-	{
-		UpdateKeys();
-		start = std::chrono::system_clock::now();
-	}
-	return state_bitmap[(virtual_key_code * 2 / 8)] & 1 << virtual_key_code % 4 * 2;
+	return GetKeyStateInfo(virtual_key_code).combinedDown;
 }
