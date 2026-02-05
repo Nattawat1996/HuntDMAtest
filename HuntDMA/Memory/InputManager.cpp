@@ -12,6 +12,10 @@ namespace Keyboard
 	uint64_t win32kbase = 0;
 	int win_logon_pid = 0;
 
+	bool IsBitmapKeyDown(const uint8_t* bitmap, uint32_t virtual_key_code)
+	{
+		return (bitmap[(virtual_key_code * 2 / 8)] & 1 << virtual_key_code % 4 * 2) != 0;
+	}
 
 	bool IsMouseVk(uint32_t virtual_key_code, int& makcuButton)
 	{
@@ -119,7 +123,12 @@ auto start = std::chrono::system_clock::now();
 
 Keyboard::KeyStateInfo Keyboard::GetKeyStateInfo(uint32_t virtual_key_code)
 {
+	KeyStateInfo info{};
+	int makcuButton = 0;
+	if (IsMouseVk(virtual_key_code, makcuButton))
+		info.makcuDown = Makcu::connected && Makcu::button_pressed(makcuButton);
 
+	if (gafAsyncKeyStateExport > 0x7FFFFFFFFFFF)
 	{
 		if (std::chrono::system_clock::now() - start > std::chrono::milliseconds(1))
 		{
