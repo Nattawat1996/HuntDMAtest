@@ -22,6 +22,7 @@
 #include "OtherEsp.h"
 #include "Overlay.h"
 #include "Aimbot.h"
+#include "Makcu.h"
 #include "SystemInfo.h"
 #include "Localization/Localization.h"
 #include <windows.h>
@@ -110,6 +111,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
         LOG_INFO("Initializing game connection...");
         InitializeGame();
+
+        LOG_INFO("Initializing Makcu device...");
+        if (!Makcu::AutoConnectMakcu()) {
+            LOG_WARNING("Failed to connect to Makcu device - aimbot will be disabled");
+            LOG_WARNING("You can manually connect via the Aimbot tab in the menu");
+        }
+        else {
+            LOG_INFO("Makcu device connected successfully: %s", Makcu::version.c_str());
+        }
 
         PlaySound(MAKEINTRESOURCE(IDR_WAVE1), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
 

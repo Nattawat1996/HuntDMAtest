@@ -113,7 +113,7 @@ void DrawPlayersEsp()
 
 			tempPos.z = playerPos.z + 1.7f;
 			Vector2 headPos;
-			if (Configs.Player.DrawHeadInFrames && !isDead)
+			if (Configs.Player.DrawHeadInFrames)
 			{
 				headPos = CameraInstance->WorldToScreen(tempPos, false);
 				if (headPos.IsZero())
@@ -122,7 +122,7 @@ void DrawPlayersEsp()
 
 			tempPos.z = playerPos.z + 2.0f;
 			Vector2 uppderFramePos;
-			if ((Configs.Player.DrawFrames || Configs.Player.DrawHealthBars) && !isDead)
+			if ((Configs.Player.DrawFrames || Configs.Player.DrawHealthBars || Configs.Player.DrawHeadInFrames))
 			{
 				uppderFramePos = CameraInstance->WorldToScreen(tempPos, false);
 				if (uppderFramePos.IsZero())
@@ -131,7 +131,7 @@ void DrawPlayersEsp()
 
 			tempPos.z = playerPos.z + 2.1f;
 			Vector2 healthBarPos;
-			if (Configs.Player.DrawHealthBars && !isDead)
+			if (Configs.Player.DrawHealthBars)
 			{
 				healthBarPos = CameraInstance->WorldToScreen(tempPos, false);
 				if (healthBarPos.IsZero())
@@ -139,7 +139,7 @@ void DrawPlayersEsp()
 			}
 
 			Vector2 offset, normal;
-			if ((Configs.Player.DrawFrames || Configs.Player.DrawHealthBars) && !isDead)
+			if ((Configs.Player.DrawFrames || Configs.Player.DrawHealthBars || Configs.Player.DrawHeadInFrames))
 			{
 				Vector2 v = uppderFramePos - feetPos;
 				float segmentLength = Vector2::Length(v);
@@ -147,7 +147,7 @@ void DrawPlayersEsp()
 				offset = normal / (2.0f * 2);
 			}
 
-			if (Configs.Player.DrawFrames && !isDead && ent->GetType() != EntityType::FriendlyPlayer)
+			if (Configs.Player.DrawFrames && ent->GetType() != EntityType::FriendlyPlayer)
 			{
 				Vector2 A1 = feetPos + offset;
 				Vector2 A2 = feetPos - offset;
@@ -183,23 +183,22 @@ void DrawPlayersEsp()
 
 				if (Configs.Player.DrawHeadInFrames)
 				{
-					Vector2 headoffset = normal / (6.0f * 2);
-					Vector2 Head1 = headPos + offset;
-					Vector2 Head2 = headPos + headoffset;
-					Vector2 Head3 = headPos - headoffset;
-					Vector2 Head4 = headPos - offset;
-
-					ESPRenderer::DrawLine(
-						ImVec2(Head1.x, Head1.y),
-						ImVec2(Head2.x, Head2.y),
-						colour,
-						1
+					// Calculate radius based on the frame width
+					float headRadius = Vector2::Distance(headPos + offset, headPos - offset) / Configs.Player.HeadCircleSize;
+					
+					// Apply offsets to head position
+					Vector2 adjustedHeadPos = Vector2(
+						headPos.x + Configs.Player.HeadCircleOffsetX,
+						headPos.y + Configs.Player.HeadCircleOffsetY
 					);
-					ESPRenderer::DrawLine(
-						ImVec2(Head3.x, Head3.y),
-						ImVec2(Head4.x, Head4.y),
+					
+					// Draw circle around head
+					ESPRenderer::DrawCircle(
+						ImVec2(adjustedHeadPos.x, adjustedHeadPos.y),
+						headRadius,
 						colour,
-						1
+						1.5f,
+						false
 					);
 				}
 			}
@@ -256,7 +255,7 @@ void DrawPlayersEsp()
 				}
 			}
 
-			if (Configs.Player.DrawHealthBars && !isDead)
+			if (Configs.Player.DrawHealthBars)
 			{
 				auto health = ent->GetHealth();
 				Vector2 Health1 = healthBarPos - offset;

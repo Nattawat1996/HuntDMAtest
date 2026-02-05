@@ -15,6 +15,9 @@ public:
     int Priority = 0;
     int FOV = 200;
     int Aimkey = 5;
+    int AimKey = 0x05;  // VK_XBUTTON1 (Mouse4)
+    bool AimAtHead = true;
+    float HeadOffsetY = 0.0f;
     bool DrawFOV = false;
     ImVec4 FOVColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     
@@ -46,6 +49,9 @@ public:
         j[ConfigName][LIT("Priority")] = Priority;
         j[ConfigName][LIT("FOV")] = FOV;
         j[ConfigName][LIT("Aimkey")] = Aimkey;
+        j[ConfigName][LIT("AimKey")] = AimKey;
+        j[ConfigName][LIT("AimAtHead")] = AimAtHead;
+        j[ConfigName][LIT("HeadOffsetY")] = HeadOffsetY;
         j[ConfigName][LIT("DrawFOV")] = DrawFOV;
         ToJsonColor(&j, LIT("FOVColor"), &FOVColor);
 
@@ -69,6 +75,12 @@ public:
             FOV = j[ConfigName][LIT("FOV")];
         if (j[ConfigName].contains(LIT("Aimkey")))
             Aimkey = j[ConfigName][LIT("Aimkey")];
+        if (j[ConfigName].contains(LIT("AimKey")))
+            AimKey = j[ConfigName][LIT("AimKey")];
+        if (j[ConfigName].contains(LIT("AimAtHead")))
+            AimAtHead = j[ConfigName][LIT("AimAtHead")];
+        if (j[ConfigName].contains(LIT("HeadOffsetY")))
+            HeadOffsetY = j[ConfigName][LIT("HeadOffsetY")];
         if (j[ConfigName].contains(LIT("DrawFOV")))
             DrawFOV = j[ConfigName][LIT("DrawFOV")];
         FromJsonColor(j, LIT("FOVColor"), &FOVColor);

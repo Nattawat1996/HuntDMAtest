@@ -3,6 +3,7 @@
 #include "Input.h"
 #include "Init.h"
 #include "Kmbox.h"
+#include "Makcu.h"
 #include "Globals.h"
 #include "ESPRenderer.h"
 #include "Localization/Localization.h"
@@ -547,7 +548,15 @@ void ImGuiMenu::RenderPlayerESPTab() {
     ColorPickerWithText(LOC("menu", "players.FramesColor").c_str(), &Configs.Player.FramesColor);
 
     if (Configs.Player.DrawFrames)
+    {
         ImGui::Checkbox(LOC("menu", "players.DrawHead").c_str(), &Configs.Player.DrawHeadInFrames);
+        if (Configs.Player.DrawHeadInFrames)
+        {
+            ImGui::SliderFloat(LOC("menu", "players.HeadCircleSize").c_str(), &Configs.Player.HeadCircleSize, 1.0f, 10.0f, "%.1f");
+            ImGui::SliderFloat(LOC("menu", "players.HeadCircleOffsetX").c_str(), &Configs.Player.HeadCircleOffsetX, -50.0f, 50.0f, "%.1f");
+            ImGui::SliderFloat(LOC("menu", "players.HeadCircleOffsetY").c_str(), &Configs.Player.HeadCircleOffsetY, -50.0f, 50.0f, "%.1f");
+        }
+    }
 
     if (Configs.Player.Enable || Configs.Player.DrawFrames)
         ImGui::Checkbox(LOC("menu", "players.DrawHealth").c_str(), &Configs.Player.DrawHealthBars);
@@ -1014,6 +1023,107 @@ void ImGuiMenu::RenderOverlayTab() {
 void ImGuiMenu::RenderAimbotTab() {
     ImGui::BeginChild("AimbotTab", ImVec2(0, 0), false);
 
+    // ========================================
+    // MAKCU DEVICE TESTING SECTION
+    // ========================================
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.25f, 0.5f));
+    ImGui::BeginChild("MakcuTesting", ImVec2(0, 200), true);
+    
+    ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "MAKCU DEVICE - CONNECTION & TESTING");
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Connection Status - Large Display
+    ImGui::Text("Status:");
+    ImGui::SameLine();
+    if (Makcu::connected) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+        ImGui::TextWrapped("CONNECTED");
+        ImGui::PopStyleColor();
+        if (!Makcu::version.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(%s)", Makcu::version.c_str());
+        }
+        if (!Makcu::portName.empty()) {
+            ImGui::Text("Port: %s", Makcu::portName.c_str());
+        }
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+        ImGui::TextWrapped("DISCONNECTED");
+        ImGui::PopStyleColor();
+        ImGui::TextWrapped("Please connect your Makcu device via USB and click 'Connect'");
+    }
+
+    ImGui::Spacing();
+    
+    // Connection Controls
+    if (Makcu::connected) {
+        if (ImGui::Button("Disconnect Makcu", ImVec2(200, 30))) {
+            Makcu::Disconnect();
+        }
+    } else {
+        if (ImGui::Button("Connect Makcu (Auto-detect)", ImVec2(200, 30))) {
+            if (Makcu::AutoConnectMakcu()) {
+                // Connection successful
+            }
+        }
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Mouse Movement Test Controls
+    if (Makcu::connected) {
+        ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Mouse Movement Test:");
+        ImGui::Text("Click buttons to test mouse movement (50px in each direction)");
+        
+        ImGui::Spacing();
+        
+        // Test buttons layout
+        ImGui::Indent(100);
+        if (ImGui::Button("Up", ImVec2(80, 30))) {
+            Makcu::move(0, -50);
+        }
+        ImGui::Unindent(100);
+        
+        ImGui::Indent(20);
+        if (ImGui::Button("Left", ImVec2(80, 30))) {
+            Makcu::move(-50, 0);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Center", ImVec2(80, 30))) {
+            Makcu::move(0, 0);  // No movement, just test command
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Right", ImVec2(80, 30))) {
+            Makcu::move(50, 0);
+        }
+        ImGui::Unindent(20);
+        
+        ImGui::Indent(100);
+        if (ImGui::Button("Down", ImVec2(80, 30))) {
+            Makcu::move(0, 50);
+        }
+        ImGui::Unindent(100);
+    } else {
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Connect Makcu device to test mouse movement");
+    }
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // ========================================
+    // AIMBOT SETTINGS SECTION
+    // ========================================
+    ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "AIMBOT SETTINGS");
+    ImGui::Separator();
+    ImGui::Spacing();
+
     // Main settings
     ImGui::BeginGroup();
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Aimbot.Enable);
@@ -1059,24 +1169,26 @@ void ImGuiMenu::RenderAimbotTab() {
 
     // Key binding
     ImGui::BeginGroup();
-    HotKey("Aim Key", &Configs.Aimbot.Aimkey);
-    ImGui::SameLine(); HelpMarker("Key to activate aimbot");
-    ImGui::EndGroup();
-
-    ImGui::Separator();
-
-    // Kmbox connection
-    ImGui::BeginGroup();
-    if (ImGui::Button("Connect To Kmbox")) {
-        kmbox::KmboxInitialize("");
+    
+    // Aim key selector with common options
+    const char* keyNames[] = { "Mouse4", "Mouse5", "Right Mouse", "Shift", "Control", "Alt" };
+    const int keyValues[] = { 0x05, 0x06, 0x02, 0x10, 0x11, 0x12 };  // VK codes
+    int currentKeyIndex = 0;
+    for (int i = 0; i < 6; i++) {
+        if (Configs.Aimbot.AimKey == keyValues[i]) {
+            currentKeyIndex = i;
+            break;
+        }
     }
-    ImGui::SameLine();
-    if (kmbox::connected) {
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Connected");
+    
+    if (ImGui::Combo("Aim Key", &currentKeyIndex, keyNames, IM_ARRAYSIZE(keyNames))) {
+        Configs.Aimbot.AimKey = keyValues[currentKeyIndex];
     }
-    else {
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Not Connected");
-    }
+    ImGui::SameLine(); HelpMarker("Key/button to activate aimbot");
+    
+    ImGui::Checkbox("Aim at Head", &Configs.Aimbot.AimAtHead);
+    ImGui::SameLine(); HelpMarker("Aims at the exact center of the drawn head circle (adjust in Player ESP tab)");
+    
     ImGui::EndGroup();
 
     ImGui::EndChild();

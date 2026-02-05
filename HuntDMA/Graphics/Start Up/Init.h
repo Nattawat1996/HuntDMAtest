@@ -3,7 +3,7 @@
 #pragma comment(lib, "Dwrite")
 #pragma comment(lib, "windowscodecs.lib")
 
-const bool enableAimBot = false;
+const bool enableAimBot = true;
 
 extern std::shared_ptr<CheatFunction> UpdateCam;
 

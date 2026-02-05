@@ -6,7 +6,7 @@
 #include "ConfigInstance.h"
 #include "WorldEntity.h"
 #include "ConfigUtilities.h"
-#include "Kmbox.h"
+#include "Makcu.h"
 #include "InputManager.h"
 #include "ESPRenderer.h"
 
@@ -147,14 +147,12 @@ std::shared_ptr<CheatFunction> UpdateAimKey = std::make_shared<CheatFunction>(50
 		return;
 	if (EnvironmentInstance->GetObjectCount() < 10)
 		return;
-	if (Keyboard::IsKeyDown(Configs.Aimbot.Aimkey))
-	{
-		AimKeyDown = true;
-	}
-	else
-	{
-		AimKeyDown = false;
-	}
+	
+	// Check both keyboard and Makcu button
+	bool keyboardHeld = Keyboard::IsKeyDown(Configs.Aimbot.AimKey);
+	bool makcuHeld = Makcu::connected && Makcu::button_pressed(Configs.Aimbot.AimKey);
+	
+	AimKeyDown = (keyboardHeld || makcuHeld);
 });
 
 std::chrono::system_clock::time_point KmboxStart;
@@ -162,36 +160,53 @@ std::chrono::system_clock::time_point KmboxStart;
 void Aimbot()
 {  
 	UpdateAimKey->Execute();
-	if (!kmbox::connected || !AimKeyDown)
+	if (!Makcu::connected || !AimKeyDown)
 	{
 		AimbotTarget = nullptr;
 		return;
 	}
-		GetAimbotTarget();
-		if (AimbotTarget == nullptr)
-			return;
-		
-		if (AimbotTarget->GetPosition() == Vector3::Zero())
-		{
-			AimbotTarget = nullptr;
-			return;
-		}
-		Vector2 screenpos = CameraInstance->WorldToScreen(AimbotTarget->GetPosition());
-		Vector2 Centerofscreen = GetCenterOfScreen();
-		if (Vector2::Distance(screenpos, Centerofscreen) > Configs.Aimbot.FOV)
-			return;
-		if (screenpos == Vector2::Zero())
-		{
-			AimbotTarget = nullptr;
-			return;
-		}
-		
-		float x = screenpos.x - Centerofscreen.x;
-		
-		if (KmboxStart + std::chrono::milliseconds(55) < std::chrono::system_clock::now())
-		{
-			kmbox::move(x,0);
-			KmboxStart = std::chrono::system_clock::now();
-		}
 	
+	GetAimbotTarget();
+	if (AimbotTarget == nullptr)
+		return;
+		
+	Vector3 targetPos = AimbotTarget->GetPosition();
+	if (targetPos == Vector3::Zero())
+	{
+		AimbotTarget = nullptr;
+		return;
+	}
+	
+	// Aim at head if enabled - using EXACT same calculation as head circle
+	if (Configs.Aimbot.AimAtHead)
+	{
+		targetPos.z += 1.7f;  // Add head height offset (same as PlayerEsp.cpp line 114)
+	}
+	
+	Vector2 screenpos = CameraInstance->WorldToScreen(targetPos);
+	
+	// Apply head circle X/Y offsets to match the drawn circle EXACTLY
+	if (Configs.Aimbot.AimAtHead)
+	{
+		screenpos.x += Configs.Player.HeadCircleOffsetX;  // Use same offsets as head circle
+		screenpos.y += Configs.Player.HeadCircleOffsetY;  // This ensures aimbot aims at circle center
+	}
+	
+	Vector2 Centerofscreen = GetCenterOfScreen();
+	if (Vector2::Distance(screenpos, Centerofscreen) > Configs.Aimbot.FOV)
+		return;
+	if (screenpos == Vector2::Zero())
+	{
+		AimbotTarget = nullptr;
+		return;
+	}
+		
+	float x = screenpos.x - Centerofscreen.x;
+	float y = screenpos.y - Centerofscreen.y;
+		
+	if (KmboxStart + std::chrono::milliseconds(55) < std::chrono::system_clock::now())
+	{
+		Makcu::move((int)x, (int)y);
+		KmboxStart = std::chrono::system_clock::now();
+	}
 }

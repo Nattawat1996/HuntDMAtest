@@ -126,6 +126,7 @@
     <ClCompile Include="Memory\Registry.cpp" />
     <ClCompile Include="Misc\CheatFunction.cpp" />
     <ClCompile Include="Misc\Input.cpp" />
+    <ClCompile Include="Misc\Makcu.cpp" />
     <ClCompile Include="Misc\Pch\Pch.cpp" />
     <ClCompile Include="Misc\Vector.cpp" />
     <ClCompile Include="SDK\Camera.cpp" />
@@ -186,6 +187,7 @@
     <ClInclude Include="Memory\Memory.h" />
     <ClInclude Include="Misc\Fonts.h" />
     <ClInclude Include="Misc\Input.h" />
+    <ClInclude Include="Misc\Makcu.h" />
     <ClInclude Include="Misc\Pch\Pch.h" />
     <ClInclude Include="Misc\Vector.h" />
     <ClInclude Include="resource.h" />

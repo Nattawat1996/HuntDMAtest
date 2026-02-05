@@ -1,7 +1,7 @@
 #pragma once
 #include "Memory.h"
 struct RenderNode {
-	char pad_01[0x10]; // 0x00(0x10)
+	char pad_01[0x18]; // 0x00(0x10)
 	unsigned __int64 rnd_flags; // 0x10(0x08)
 	char pad_02[0x14]; // 0x18(0x14)
 	unsigned int silhouettes_param; // 0x2C(0x04)
@@ -9,7 +9,7 @@ struct RenderNode {
 	float m_fWSMaxViewDist; //0x38(0x4)
 };
 struct HealthBar {
-	char pad_01[0x10]; // 0x00(0x10)
+	char pad_01[0x18]; // 0x00(0x10)
 	unsigned int current_hp; // 0x10(0x04)
 	unsigned int regenerable_max_hp; // 0x14(0x04)
 	unsigned int current_max_hp; // 0x18(0x04)
@@ -128,10 +128,10 @@ private:
 	uint64_t TypeNamePointer2 = 0x0;
 	EntityNameStruct TypeName;
 
-	const uint64_t HpOffset1 = 0x50;  // Candidate B - Position 0x02838F5C
-	const uint64_t HpOffset2 = 0x78;  // Matches old HpOffset4
-	const uint64_t HpOffset3 = 0x68;
-	const uint64_t HpOffset4 = 0x40;
+	const uint64_t HpOffset1 = 0x192;  // Candidate B - Position 0x02838F5C
+	const uint64_t HpOffset2 = 0x20;  // Matches old HpOffset4
+	const uint64_t HpOffset3 = 0xC8;
+	const uint64_t HpOffset4 = 0x78;
 	const uint64_t HpOffset5 = 0x58;  // Confirmed correct
 	uint64_t HpPointer1 = 0x0;
 	uint64_t HpPointer2 = 0x0;
@@ -256,9 +256,9 @@ public:
 
 	uint64_t SpecCountOffset1 = 0x198;
 	uint64_t SpecCountOffset2 = 0x20;
-	uint64_t SpecCountOffset3 = 0xd0;
-	uint64_t SpecCountOffset4 = 0x100;
-	uint64_t SpecCountOffset5 = 0x10;
+	uint64_t SpecCountOffset3 = 0xC8;
+	uint64_t SpecCountOffset4 = 0x78;
+	uint64_t SpecCountOffset5 = 0x18;
 	uint64_t SpecCountPointer1 = 0x0;
 	uint64_t SpecCountPointer2 = 0x0;
 	uint64_t SpecCountPointer3 = 0x0;

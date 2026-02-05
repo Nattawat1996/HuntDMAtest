@@ -23,6 +23,9 @@ public:
     bool ShowDead = false;
     bool DrawFrames = true;
     bool DrawHeadInFrames = true;
+    float HeadCircleSize = 2.5f;
+    float HeadCircleOffsetX = 0.0f;
+    float HeadCircleOffsetY = 0.0f;
     bool DrawHealthBars = true;
     ImVec4 FramesColor = ImVec4(0.988235f, 0.949019f, 0.019607f, 1.0f);
     ImVec4 FriendColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
@@ -65,6 +68,9 @@ public:
         j[ConfigName][LIT("ShowDead")] = ShowDead;
         j[ConfigName][LIT("DrawFrames")] = DrawFrames;
         j[ConfigName][LIT("DrawHeadInFrames")] = DrawHeadInFrames;
+        j[ConfigName][LIT("HeadCircleSize")] = HeadCircleSize;
+        j[ConfigName][LIT("HeadCircleOffsetX")] = HeadCircleOffsetX;
+        j[ConfigName][LIT("HeadCircleOffsetY")] = HeadCircleOffsetY;
         j[ConfigName][LIT("DrawHealthBars")] = DrawHealthBars;
         j[ConfigName][LIT("ShowPlayerList")] = ShowPlayerList;
         j[ConfigName][LIT("PlayerListFontSize")] = PlayerListFontSize;
@@ -105,6 +111,12 @@ public:
             ShowDead = j[ConfigName][LIT("ShowDead")];
         if (j[ConfigName].contains(LIT("DrawHeadInFrames")))
             DrawHeadInFrames = j[ConfigName][LIT("DrawHeadInFrames")];
+        if (j[ConfigName].contains(LIT("HeadCircleSize")))
+            HeadCircleSize = j[ConfigName][LIT("HeadCircleSize")];
+        if (j[ConfigName].contains(LIT("HeadCircleOffsetX")))
+            HeadCircleOffsetX = j[ConfigName][LIT("HeadCircleOffsetX")];
+        if (j[ConfigName].contains(LIT("HeadCircleOffsetY")))
+            HeadCircleOffsetY = j[ConfigName][LIT("HeadCircleOffsetY")];
         if (j[ConfigName].contains(LIT("DrawHealthBars")))
             DrawHealthBars = j[ConfigName][LIT("DrawHealthBars")];
         if (j[ConfigName].contains(LIT("ShowPlayerList")))
