@@ -12,6 +12,7 @@ namespace Keyboard
 	uint64_t win32kbase = 0;
 	int win_logon_pid = 0;
 
+
 	bool IsMouseVk(uint32_t virtual_key_code, int& makcuButton)
 	{
 		switch (virtual_key_code)
@@ -116,31 +117,25 @@ void Keyboard::UpdateKeys()
 
 auto start = std::chrono::system_clock::now();
 
-bool Keyboard::IsKeyDown(uint32_t virtual_key_code)
+Keyboard::KeyStateInfo Keyboard::GetKeyStateInfo(uint32_t virtual_key_code)
 {
-	int makcuButton = 0;
-	if (IsMouseVk(virtual_key_code, makcuButton))
-	{
-		const bool makcuDown = Makcu::connected && Makcu::button_pressed(makcuButton);
-		if (gafAsyncKeyStateExport < 0x7FFFFFFFFFFF)
-			return makcuDown;
 
+	{
 		if (std::chrono::system_clock::now() - start > std::chrono::milliseconds(1))
 		{
 			UpdateKeys();
 			start = std::chrono::system_clock::now();
 		}
 
-		const bool dmaDown = (state_bitmap[(virtual_key_code * 2 / 8)] & 1 << virtual_key_code % 4 * 2) != 0;
-		return dmaDown || makcuDown;
+		info.dmaAvailable = true;
+		info.dmaDown = IsBitmapKeyDown(state_bitmap, virtual_key_code);
 	}
 
-	if (gafAsyncKeyStateExport < 0x7FFFFFFFFFFF)
-		return false;
-	if (std::chrono::system_clock::now() - start > std::chrono::milliseconds(1))
-	{
-		UpdateKeys();
-		start = std::chrono::system_clock::now();
-	}
-	return state_bitmap[(virtual_key_code * 2 / 8)] & 1 << virtual_key_code % 4 * 2;
+	info.combinedDown = info.dmaDown || info.makcuDown;
+	return info;
+}
+
+bool Keyboard::IsKeyDown(uint32_t virtual_key_code)
+{
+	return GetKeyStateInfo(virtual_key_code).combinedDown;
 }
