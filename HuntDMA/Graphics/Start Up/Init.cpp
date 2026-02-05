@@ -46,7 +46,7 @@ void InitializeESP()
 	if (enableAimBot)
 	{
 		Keyboard::InitKeyboard();
-		// Makcu initialization is now handled in Main.cpp
+		kmbox::KmboxInitialize("");
 	}
 }
 

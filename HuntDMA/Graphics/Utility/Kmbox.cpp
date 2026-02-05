@@ -96,7 +96,7 @@ namespace kmbox
 
 		if (!SetCommTimeouts(serial_handle, &timeouts))
 		{
-			
+
 			CloseHandle(serial_handle);
 			return;
 		}
