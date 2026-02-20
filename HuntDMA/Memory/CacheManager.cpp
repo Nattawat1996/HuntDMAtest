@@ -30,8 +30,8 @@ void CacheManager::CacheThreadFunction()
     {
         if (EnvironmentInstance && EnvironmentInstance->GetObjectCount() > 10)
         {
-            Cache();
             UpdateLocalPlayer();
+            Cache();
 
             auto sleep_time = std::chrono::milliseconds(8000);
 

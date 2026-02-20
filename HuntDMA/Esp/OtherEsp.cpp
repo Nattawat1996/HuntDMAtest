@@ -200,6 +200,9 @@ void DrawPOI()
 		if (distance <= 0 || distance > Configs.POI.MaxDistance)
 			continue;
 
+		if (!Configs.POI.ShowBoons && (type == EntityType::EventBoon))
+			continue;
+
 		if (!ent->GetValid())
 			continue;
 
@@ -208,12 +211,19 @@ void DrawPOI()
 			continue;
 
 		std::string name = Configs.POI.Name ? LOC("entity", ent->GetTypeAsString()) : "";
+		if (type == EntityType::EventBoon && !ent->CompactTypeName.empty())
+			name = ent->CompactTypeName;
+
 		std::string distanceText = Configs.POI.Distance ? std::vformat(LOC("menu", "esp.Meters"), std::make_format_args(distance)) : "";
+
+		ImVec4 color = Configs.POI.TextColor;
+		if (type == EntityType::EventBoon)
+			color = Configs.POI.BoonColor;
 
 		ESPRenderer::DrawText(
 			ImVec2(pos.x, pos.y),
 			name + distanceText,
-			Configs.POI.TextColor,
+			color,
 			Configs.POI.FontSize,
 			Center
 		);

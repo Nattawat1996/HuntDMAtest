@@ -1,5 +1,6 @@
-#include <chrono>
 #pragma once
+#include <chrono>
+#include <functional>
 class CheatFunction
 {
 	int MsSleep = 0;

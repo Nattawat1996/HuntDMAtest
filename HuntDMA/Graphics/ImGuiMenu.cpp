@@ -6,6 +6,7 @@
 #include "Globals.h"
 #include "ESPRenderer.h"
 #include "Localization/Localization.h"
+#include "WeaponPresets.h"
 
 // Global instances
 ImGuiMenu g_ImGuiMenu;
@@ -46,6 +47,18 @@ namespace ImGuiUtils {
         case VK_MBUTTON: return ImGuiKey_MouseMiddle;
         case VK_XBUTTON1: return ImGuiKey_MouseX1;
         case VK_XBUTTON2: return ImGuiKey_MouseX2;
+        case VK_F1: return ImGuiKey_F1;
+        case VK_F2: return ImGuiKey_F2;
+        case VK_F3: return ImGuiKey_F3;
+        case VK_F4: return ImGuiKey_F4;
+        case VK_F5: return ImGuiKey_F5;
+        case VK_F6: return ImGuiKey_F6;
+        case VK_F7: return ImGuiKey_F7;
+        case VK_F8: return ImGuiKey_F8;
+        case VK_F9: return ImGuiKey_F9;
+        case VK_F10: return ImGuiKey_F10;
+        case VK_F11: return ImGuiKey_F11;
+        case VK_F12: return ImGuiKey_F12;
         default:
             if (vk >= '0' && vk <= '9') return (ImGuiKey)(ImGuiKey_0 + (vk - '0'));
             if (vk >= 'A' && vk <= 'Z') return (ImGuiKey)(ImGuiKey_A + (vk - 'A'));
@@ -79,6 +92,18 @@ namespace ImGuiUtils {
         case ImGuiKey_MouseMiddle: return VK_MBUTTON;
         case ImGuiKey_MouseX1: return VK_XBUTTON1;
         case ImGuiKey_MouseX2: return VK_XBUTTON2;
+        case ImGuiKey_F1: return VK_F1;
+        case ImGuiKey_F2: return VK_F2;
+        case ImGuiKey_F3: return VK_F3;
+        case ImGuiKey_F4: return VK_F4;
+        case ImGuiKey_F5: return VK_F5;
+        case ImGuiKey_F6: return VK_F6;
+        case ImGuiKey_F7: return VK_F7;
+        case ImGuiKey_F8: return VK_F8;
+        case ImGuiKey_F9: return VK_F9;
+        case ImGuiKey_F10: return VK_F10;
+        case ImGuiKey_F11: return VK_F11;
+        case ImGuiKey_F12: return VK_F12;
         default:
             if (key >= ImGuiKey_0 && key <= ImGuiKey_9) return '0' + (key - ImGuiKey_0);
             if (key >= ImGuiKey_A && key <= ImGuiKey_Z) return 'A' + (key - ImGuiKey_A);
@@ -100,6 +125,52 @@ namespace ImGuiUtils {
 
 ImGuiMenu::~ImGuiMenu() {
     Shutdown();
+}
+
+// Helper: Slider + Input Box (Float)
+// Layout: [ Slider (60%) ] [ Input (20%) ] [ Label (Rest) ]
+static void SliderFloatWithInput(const char* label, float* v, float v_min, float v_max, const char* format = "%.3f")
+{
+    float width = ImGui::GetContentRegionAvail().x;
+    float sliderWidth = width * 0.60f;
+    float inputWidth = width * 0.20f; 
+
+    ImGui::PushItemWidth(sliderWidth);
+    ImGui::SliderFloat(std::string("##Slider_").append(label).c_str(), v, v_min, v_max, format);
+    ImGui::PopItemWidth();
+
+    ImGui::SameLine();
+    
+    // Use a unique ID for the input box based on label
+    std::string inputLabel = std::string("##Input_") + label;
+    ImGui::PushItemWidth(inputWidth);
+    ImGui::InputFloat(inputLabel.c_str(), v, 0.0f, 0.0f, format);
+    ImGui::PopItemWidth();
+
+    ImGui::SameLine();
+    ImGui::Text(label);
+}
+
+// Helper: Slider + Input Box (Int)
+static void SliderIntWithInput(const char* label, int* v, int v_min, int v_max, const char* format = "%d")
+{
+    float width = ImGui::GetContentRegionAvail().x;
+    float sliderWidth = width * 0.60f;
+    float inputWidth = width * 0.20f;
+
+    ImGui::PushItemWidth(sliderWidth);
+    ImGui::SliderInt(std::string("##Slider_").append(label).c_str(), v, v_min, v_max, format);
+    ImGui::PopItemWidth();
+
+    ImGui::SameLine();
+
+    std::string inputLabel = std::string("##Input_") + label;
+    ImGui::PushItemWidth(inputWidth);
+    ImGui::InputInt(inputLabel.c_str(), v, 0, 0);
+    ImGui::PopItemWidth();
+
+    ImGui::SameLine();
+    ImGui::Text(label);
 }
 
 bool ImGuiMenu::CreateDeviceD3D(HWND hWnd) {
@@ -204,6 +275,9 @@ bool ImGuiMenu::Init(HWND hWnd) {
     ImGui_ImplWin32_Init(hWnd);
     ImGui_ImplDX11_Init(d3dDevice, d3dDeviceContext);
 
+    // Register ESP toggle hotkeys (if aimbot/keyboard is enabled)
+    InitializeHotkeys();
+
     initialized = true;
     return true;
 }
@@ -267,6 +341,41 @@ void ImGuiMenu::HandleInput() {
     if (ImGuiUtils::IsKeyPressed(Configs.General.OpenMenuKey) && ImGuiUtils::IsKeyPressed(VK_END)) {
         exit(0);
     }
+
+    // Note: ESP toggles now handled by registered hotkeys in InitializeHotkeys()
+    // No need for manual polling here - the keyboard polling thread fires callbacks automatically
+}
+
+void ImGuiMenu::InitializeHotkeys()
+{
+    // Register dynamic hotkeys (by pointer) so runtime changes work immediately
+    Keyboard::RegisterDynamicHotkey(&Configs.Player.ToggleKey, []() {
+        Configs.Player.Enable = !Configs.Player.Enable;
+    });
+
+    Keyboard::RegisterDynamicHotkey(&Configs.Bosses.ToggleKey, []() {
+        Configs.Bosses.Enable = !Configs.Bosses.Enable;
+    });
+
+    Keyboard::RegisterDynamicHotkey(&Configs.Supply.ToggleKey, []() {
+        Configs.Supply.Enable = !Configs.Supply.Enable;
+    });
+
+    Keyboard::RegisterDynamicHotkey(&Configs.BloodBonds.ToggleKey, []() {
+        Configs.BloodBonds.Enable = !Configs.BloodBonds.Enable;
+    });
+
+    Keyboard::RegisterDynamicHotkey(&Configs.Trap.ToggleKey, []() {
+        Configs.Trap.Enable = !Configs.Trap.Enable;
+    });
+
+    Keyboard::RegisterDynamicHotkey(&Configs.POI.ToggleKey, []() {
+        Configs.POI.Enable = !Configs.POI.Enable;
+    });
+
+    Keyboard::RegisterDynamicHotkey(&Configs.Traits.ToggleKey, []() {
+        Configs.Traits.Enable = !Configs.Traits.Enable;
+    });
 }
 
 void ImGuiMenu::ColorPickerWithText(const char* label, ImVec4* color) {
@@ -314,9 +423,30 @@ bool ImGuiMenu::HotKey(const char* label, int* key) {
         ImGui::Text(LOC("menu", "hotkey.Instructions").c_str());
         
         // Check mouse input
-        if (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1)) {
-            ImGui::CloseCurrentPopup();
-            return false;
+        if (ImGui::IsMouseClicked(0)) {
+             *key = VK_LBUTTON;
+             changed = true;
+             ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsMouseClicked(1)) {
+             *key = VK_RBUTTON;
+             changed = true;
+             ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsMouseClicked(2)) {
+             *key = VK_MBUTTON;
+             changed = true;
+             ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsMouseClicked(3)) {
+             *key = VK_XBUTTON1;
+             changed = true;
+             ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsMouseClicked(4)) {
+             *key = VK_XBUTTON2;
+             changed = true;
+             ImGui::CloseCurrentPopup();
         }
 
         // Check key input
@@ -492,6 +622,9 @@ void ImGuiMenu::RenderPlayerESPTab() {
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Player.TextColor);
 
+    ImGui::SameLine();
+    HotKey("Toggle Key", &Configs.Player.ToggleKey);
+
     ImGui::SliderInt(LOC("menu", "general.MaxDistance").c_str(), &Configs.Player.MaxDistance, 0, 1500, LOC("menu", "general.Meters").c_str());
 
     if (Configs.Player.Enable)
@@ -560,6 +693,8 @@ void ImGuiMenu::RenderPlayerESPTab() {
     if (Configs.Player.Enable || Configs.Player.DrawFrames)
         ImGui::Checkbox(LOC("menu", "players.DrawHealth").c_str(), &Configs.Player.DrawHealthBars);
 
+    ImGui::Checkbox(LOC("menu", "players.Snaplines").c_str(), &Configs.Player.Snaplines);
+
     ImGui::EndChild();
 }
 
@@ -569,6 +704,9 @@ void ImGuiMenu::RenderBossesESPTab() {
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Bosses.Enable);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Bosses.TextColor);
+
+    ImGui::SameLine();
+    HotKey("Toggle Key", &Configs.Bosses.ToggleKey);
 
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.Bosses.Name);
     ImGui::SameLine();
@@ -586,6 +724,9 @@ void ImGuiMenu::RenderSupplyESPTab() {
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Supply.Enable);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Supply.TextColor);
+
+    ImGui::SameLine();
+    HotKey("Toggle Key", &Configs.Supply.ToggleKey);
 
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.Supply.Name);
     ImGui::SameLine();
@@ -627,6 +768,9 @@ void ImGuiMenu::RenderBloodBondsESPTab() {
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.BloodBonds.TextColor);
 
+    ImGui::SameLine();
+    HotKey("Toggle Key", &Configs.BloodBonds.ToggleKey);
+
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.BloodBonds.Name);
     ImGui::SameLine();
     ImGui::Checkbox(LOC("menu", "general.Distance").c_str(), &Configs.BloodBonds.Distance);
@@ -641,6 +785,9 @@ void ImGuiMenu::RenderTrapESPTab() {
     ImGui::BeginChild("TrapESPTab", ImVec2(0, 0), false);
 
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Trap.Enable);
+    ImGui::SameLine();
+    HotKey("Toggle Key", &Configs.Trap.ToggleKey);
+
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "traps.TrapColor").c_str(), &Configs.Trap.TrapColor);
     ImGui::SameLine();
@@ -680,6 +827,9 @@ void ImGuiMenu::RenderPOIESPTab() {
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.POI.TextColor);
 
+    ImGui::SameLine();
+    HotKey("Toggle Key", &Configs.POI.ToggleKey);
+
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.POI.Name);
     ImGui::SameLine();
     ImGui::Checkbox(LOC("menu", "general.Distance").c_str(), &Configs.POI.Distance);
@@ -707,6 +857,9 @@ void ImGuiMenu::RenderPOIESPTab() {
     ImGui::Checkbox(LOC("menu", "poi.ShowSeasonalDestructibles").c_str(), &Configs.POI.ShowSeasonalDestructibles);
     ImGui::SameLine();
     HelpMarker(LOC("menu", "poi.ShowSeasonalDestructiblesInfo").c_str());
+    ImGui::Checkbox(LOC("menu", "poi.ShowBoons").c_str(), &Configs.POI.ShowBoons);
+    ImGui::SameLine();
+    ImGui::ColorEdit4("##BoonColor", (float*)&Configs.POI.BoonColor, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar);
     ImGui::EndGroup();
 
     ImGui::EndChild();
@@ -720,6 +873,9 @@ void ImGuiMenu::RenderTraitESPTab() {
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Traits.Enable);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Traits.TraitColor);
+    
+    ImGui::SameLine();
+    HotKey("Toggle Key", &Configs.Traits.ToggleKey);
     
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.Traits.Name);
     ImGui::SameLine();
@@ -959,6 +1115,12 @@ void ImGuiMenu::RenderOverlayTab() {
     ColorPickerWithText(LOC("menu", "overlay.PlayerColor").c_str(), &Configs.Overlay.PlayerRadarColor);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "overlay.EnemyColor").c_str(), &Configs.Overlay.EnemyRadarColor);
+    
+    // Manual Adjustments
+    SliderFloatWithInput(LOC("menu", "overlay.RadarScale").c_str(), &Configs.Overlay.RadarScale, 0.1f, 2.0f, "%.5f");
+    SliderFloatWithInput(LOC("menu", "overlay.RadarX").c_str(), &Configs.Overlay.RadarX, -0.05f, 0.05f, "%.5f");
+    SliderFloatWithInput(LOC("menu", "overlay.RadarY").c_str(), &Configs.Overlay.RadarY, -0.05f, 0.05f, "%.5f");
+
     ImGui::EndGroup();
 
     ImGui::Separator();
@@ -1019,6 +1181,8 @@ void ImGuiMenu::RenderOverlayTab() {
     ImGui::EndChild();
 }
 
+
+
 void ImGuiMenu::RenderAimbotTab() {
     ImGui::BeginChild("AimbotTab", ImVec2(0, 0), false);
 
@@ -1029,6 +1193,133 @@ void ImGuiMenu::RenderAimbotTab() {
 
     ImGui::Checkbox("Target Players", &Configs.Aimbot.TargetPlayers);
     ImGui::SameLine(); HelpMarker("Only target player entities");
+
+    if (ImGui::Button("Test Connection (Square Move)")) {
+        kmbox::test_move();
+    }
+    ImGui::SameLine(); HelpMarker("Moves mouse in a small square to verify connection");
+
+    ImGui::EndGroup();
+
+    ImGui::Separator();
+
+    // Device Type & Connection settings
+    ImGui::BeginGroup();
+    ImGui::Text("Device Connection");
+
+    static const char* deviceTypes[] = {
+        "AutoDetect", "Makcu", "Standard KMBox", "Kmbox Net"
+    };
+    ImGui::Combo("Device Type", &Configs.Aimbot.KmboxDeviceType, deviceTypes, IM_ARRAYSIZE(deviceTypes));
+    ImGui::SameLine(); HelpMarker(
+        "AutoDetect: Tries Makcu first, then Standard KMBox\n"
+        "Makcu: Force Makcu mode (4MHz handshake)\n"
+        "Standard KMBox: Direct connection at configured baud rate\n"
+        "Kmbox Net: Connect via UDP network (IP/Port)\n\n"
+        "If you have a standard KMBox B/B+, select 'Standard KMBox'.\n"
+        "If unsure, use 'AutoDetect'."
+    );
+
+    if (Configs.Aimbot.KmboxDeviceType == 3) // Kmbox Net
+    {
+        static char ipBuf[64];
+        if (ipBuf[0] == 0) strcpy_s(ipBuf, Configs.Aimbot.KmboxIP.c_str());
+        if (ImGui::InputText("IP Address", ipBuf, sizeof(ipBuf))) Configs.Aimbot.KmboxIP = ipBuf;
+
+        static char portBuf[16];
+        if (portBuf[0] == 0) strcpy_s(portBuf, Configs.Aimbot.KmboxNetPort.c_str());
+        if (ImGui::InputText("Port", portBuf, sizeof(portBuf))) Configs.Aimbot.KmboxNetPort = portBuf;
+
+        static char uuidBuf[64];
+        if (uuidBuf[0] == 0) strcpy_s(uuidBuf, Configs.Aimbot.KmboxUUID.c_str());
+        if (ImGui::InputText("UUID (Optional)", uuidBuf, sizeof(uuidBuf))) Configs.Aimbot.KmboxUUID = uuidBuf;
+    }
+    else
+    {
+        // COM Port selection
+        static std::vector<kmbox::PortInfo> availablePorts;
+        static int selectedPortIdx = 0; // 0 = Auto
+
+        if (ImGui::Button("Scan Ports")) {
+            availablePorts = kmbox::enumerate_ports();
+            selectedPortIdx = 0; // Reset to Auto
+            // Try to find the saved port in the list
+            if (!Configs.Aimbot.KmboxPort.empty()) {
+                for (int i = 0; i < (int)availablePorts.size(); i++) {
+                    if (availablePorts[i].portName == Configs.Aimbot.KmboxPort) {
+                        selectedPortIdx = i + 1; // +1 because 0 is "Auto"
+                        break;
+                    }
+                }
+            }
+        }
+        ImGui::SameLine();
+        
+        // Build port list for combo (first item is "Auto")
+        std::string currentPortLabel = "Auto (scan all)";
+        if (selectedPortIdx > 0 && selectedPortIdx <= (int)availablePorts.size()) {
+            currentPortLabel = availablePorts[selectedPortIdx - 1].portName + " - " + availablePorts[selectedPortIdx - 1].description;
+        } else if (!Configs.Aimbot.KmboxPort.empty()) {
+            currentPortLabel = Configs.Aimbot.KmboxPort + " (saved)";
+        }
+
+        if (ImGui::BeginCombo("COM Port", currentPortLabel.c_str())) {
+            // Auto option
+            bool isAutoSelected = (selectedPortIdx == 0 && Configs.Aimbot.KmboxPort.empty());
+            if (ImGui::Selectable("Auto (scan all)", isAutoSelected)) {
+                selectedPortIdx = 0;
+                Configs.Aimbot.KmboxPort = "";
+            }
+            if (isAutoSelected) ImGui::SetItemDefaultFocus();
+
+            // Listed ports
+            for (int i = 0; i < (int)availablePorts.size(); i++) {
+                std::string label = availablePorts[i].portName + " - " + availablePorts[i].description;
+                bool isSelected = (selectedPortIdx == i + 1);
+                if (ImGui::Selectable(label.c_str(), isSelected)) {
+                    selectedPortIdx = i + 1;
+                    Configs.Aimbot.KmboxPort = availablePorts[i].portName;
+                }
+                if (isSelected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine(); HelpMarker(
+            "Click 'Scan Ports' to find available COM ports.\n"
+            "Select 'Auto' to let the program find the device,\n"
+            "or pick a specific port if you know which one your device is on."
+        );
+
+        // Baud Rate configuration
+        ImGui::InputInt("Baud Rate", &Configs.Aimbot.KmboxBaudRate);
+        ImGui::SameLine(); HelpMarker(
+            "Baud rate for Standard KMBox mode.\n"
+            "Default: 115200. Common values: 9600, 115200.\n"
+            "For Makcu devices, this is ignored (uses 4MHz)."
+        );
+    }
+
+    if (ImGui::Button("Connect")) {
+        if (Configs.Aimbot.KmboxDeviceType == 3) {
+             kmbox::NetInitialize(Configs.Aimbot.KmboxIP, Configs.Aimbot.KmboxNetPort, Configs.Aimbot.KmboxUUID);
+        } else {
+             kmbox::KmboxInitialize(Configs.Aimbot.KmboxPort, Configs.Aimbot.KmboxBaudRate, (kmbox::DeviceType)Configs.Aimbot.KmboxDeviceType);
+        }
+    }
+    ImGui::SameLine();
+    if (kmbox::connected) {
+        const char* detectedName = "Unknown";
+        switch (kmbox::detectedDevice) {
+            case kmbox::DeviceType::Makcu: detectedName = "Makcu (4MHz)"; break;
+            case kmbox::DeviceType::StandardKmbox: detectedName = "Standard KMBox"; break;
+            case kmbox::DeviceType::KmboxNet: detectedName = "Kmbox Net"; break;
+            default: detectedName = "Connected"; break;
+        }
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s on %s", detectedName, kmbox::connectedPort.c_str());
+    }
+    else {
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Not Connected");
+    }
     ImGui::EndGroup();
 
     ImGui::Separator();
@@ -1065,26 +1356,202 @@ void ImGuiMenu::RenderAimbotTab() {
 
     ImGui::Separator();
 
-    // Key binding
+    // Prediction settings
     ImGui::BeginGroup();
-    HotKey("Aim Key", &Configs.Aimbot.Aimkey);
-    ImGui::SameLine(); HelpMarker("Key to activate aimbot");
+    ImGui::Text("Prediction");
+    ImGui::Checkbox("Enable Prediction", &Configs.Aimbot.Prediction);
+    ImGui::SameLine(); HelpMarker(
+        "Lead targets based on their movement velocity and bullet travel time.\n"
+        "When enabled, the aimbot aims where the target WILL BE when the bullet arrives."
+    );
+
+    if (Configs.Aimbot.Prediction) {
+
+        // ── Weapon Preset Selector ──
+        ImGui::Separator();
+        ImGui::Text("Weapon Ballistics");
+
+        // Build label for current preset
+        int presetIdx = Configs.Aimbot.WeaponPreset;
+        if (presetIdx < 0 || presetIdx >= WeaponPresetCount) presetIdx = 0;
+        const char* presetLabel = WeaponPresets[presetIdx].name;
+
+        static char weaponSearchBuf[64] = "";
+        if (ImGui::BeginCombo("Weapon Preset", presetLabel)) {
+            // Search input at top of dropdown
+            if (ImGui::IsWindowAppearing()) {
+                ImGui::SetKeyboardFocusHere();
+                weaponSearchBuf[0] = '\0';
+            }
+            ImGui::InputTextWithHint("##WeaponSearch", "Search weapon...", weaponSearchBuf, sizeof(weaponSearchBuf));
+            ImGui::Separator();
+
+            for (int i = 0; i < WeaponPresetCount; i++) {
+                // Filter by search text
+                if (weaponSearchBuf[0] != '\0' && i > 0) {
+                    // Case-insensitive substring match
+                    std::string name = WeaponPresets[i].name;
+                    std::string search = weaponSearchBuf;
+                    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+                    std::transform(search.begin(), search.end(), search.begin(), ::tolower);
+                    if (name.find(search) == std::string::npos)
+                        continue;
+                }
+
+                bool isSelected = (presetIdx == i);
+                // Format: "Name" for Custom, "Name (XXXm/s, DRxxx)" for weapons
+                char itemLabel[128];
+                if (i == 0)
+                    snprintf(itemLabel, sizeof(itemLabel), "%s", WeaponPresets[i].name);
+                else
+                    snprintf(itemLabel, sizeof(itemLabel), "%s (%.0fm/s, DR%.0f)", 
+                        WeaponPresets[i].name, WeaponPresets[i].bulletSpeed, WeaponPresets[i].dropRange);
+                
+                if (ImGui::Selectable(itemLabel, isSelected)) {
+                    Configs.Aimbot.WeaponPreset = i;
+                    if (i > 0) {
+                        // Apply preset values
+                        Configs.Aimbot.BulletSpeed = WeaponPresets[i].bulletSpeed;
+                        Configs.Aimbot.DropRange = WeaponPresets[i].dropRange;
+                        Configs.Aimbot.AmmoType = WeaponPresets[i].ammoType;
+                    }
+                }
+                if (isSelected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine(); HelpMarker(
+            "Select a weapon to auto-fill Bullet Speed, Drop Range, and Ammo Type.\n"
+            "Choose 'Custom' to set values manually.\n"
+            "Changing any ballistic slider will revert to 'Custom'."
+        );
+
+        // Show current preset info
+        if (Configs.Aimbot.WeaponPreset > 0 && Configs.Aimbot.WeaponPreset < WeaponPresetCount) {
+            const char* ammoNames[] = { "Compact", "Medium", "Long" };
+            int at = WeaponPresets[Configs.Aimbot.WeaponPreset].ammoType;
+            ImGui::TextDisabled("  %s | %.0f m/s | DR %.0f m", 
+                (at >= 0 && at <= 2) ? ammoNames[at] : "?",
+                Configs.Aimbot.BulletSpeed, Configs.Aimbot.DropRange);
+        }
+
+        // Track previous values to detect manual changes
+        float prevBulletSpeed = Configs.Aimbot.BulletSpeed;
+        float prevDropRange = Configs.Aimbot.DropRange;
+        int prevAmmoType = Configs.Aimbot.AmmoType;
+
+        ImGui::Separator();
+
+        SliderFloatWithInput("Bullet Speed", &Configs.Aimbot.BulletSpeed, 100.0f, 900.0f, "%.0f m/s");
+        ImGui::SameLine(); HelpMarker(
+            "Muzzle velocity of the weapon in meters per second.\n"
+            "Auto-filled by weapon preset, or set manually."
+        );
+
+        SliderFloatWithInput("Aim Smoothing", &Configs.Aimbot.Smoothing, 1.0f, 20.0f, "%.1f");
+        ImGui::SameLine(); HelpMarker(
+            "How smoothly the aim moves to the target.\n"
+            "1.0 = Instant snap (least natural)\n"
+            "5.0 = Smooth (recommended)\n"
+            "20.0 = Very slow movement"
+        );
+
+        SliderIntWithInput("Update Delay", &Configs.Aimbot.UpdateRate, 1, 50, "%d ms");
+        ImGui::SameLine(); HelpMarker(
+            "Delay between aim updates in milliseconds.\n"
+            "Lower = Faster/Smoother updates (Higher CPU/Network usage)\n"
+            "Higher = Slower/Choppier updates\n"
+            "Default: 10ms (100Hz)\n"
+            "Recommended for smoothness: 1-5ms"
+        );
+
+        SliderFloatWithInput("Lock Stability", &Configs.Aimbot.Stability, 0.0f, 1.0f, "%.2f");
+        ImGui::SameLine(); HelpMarker(
+            "Reduces shaking/jitter by ignoring tiny sub-pixel movements.\n"
+            "0.0 = No stabilization (maximum responsiveness)\n"
+            "0.5 = Balanced dampening\n"
+            "1.0 = Strong dampening (may feel 'sticky')\n"
+            "Increase if aim shakes at long range."
+        );
+
+        SliderFloatWithInput("Prediction Scale", &Configs.Aimbot.PredictionScale, 0.0f, 2.0f, "%.2f");
+        ImGui::SameLine(); HelpMarker(
+            "Fine-tune the prediction amount.\n"
+            "1.0 = Physics-accurate prediction\n"
+            "< 1.0 = Under-lead (for close range)\n"
+            "> 1.0 = Over-lead (for latency compensation)"
+        );
+
+        SliderFloatWithInput("Drop Range", &Configs.Aimbot.DropRange, 10.0f, 500.0f, "%.0f m");
+        ImGui::SameLine(); HelpMarker(
+            "Distance before bullet drop becomes significant.\n"
+            "Auto-filled by weapon preset, or set manually."
+        );
+
+        ImGui::Checkbox("Auto Drop Power", &Configs.Aimbot.AutoDropPower);
+        ImGui::SameLine(); HelpMarker(
+            "Automatically calculates Drop Power from Drop Range.\n"
+            "Calibrated from user testing data.\n"
+            "Uncheck to manually tune Drop Power."
+        );
+
+        if (Configs.Aimbot.AutoDropPower)
+        {
+            // Ammo Type selector (only visible when Auto is on)
+            const char* ammoTypes[] = { "Compact/Small", "Medium", "Long" };
+            ImGui::Combo("Ammo Type", &Configs.Aimbot.AmmoType, ammoTypes, IM_ARRAYSIZE(ammoTypes));
+            ImGui::SameLine(); HelpMarker(
+                "Small/Medium: Standard drop curve\n"
+                "Long: Flatter trajectory (+0.2 power)\n"
+                "Auto-filled by weapon preset."
+            );
+
+            // Show computed power
+            float autoPower;
+            if (Configs.Aimbot.DropRange < 90.0f)
+                autoPower = 2.0f + (Configs.Aimbot.DropRange - 90.0f) * 0.027f;
+            else
+                autoPower = 2.0f + (Configs.Aimbot.DropRange - 90.0f) * 0.006f;
+            if (autoPower < 1.0f) autoPower = 1.0f;
+            if (Configs.Aimbot.AmmoType == 2) autoPower += 0.2f;
+            ImGui::TextDisabled("Computed Power: %.2f", autoPower);
+        }
+        else
+        {
+            SliderFloatWithInput("Drop Power", &Configs.Aimbot.DropPower, 1.0f, 4.0f, "%.2f");
+            ImGui::SameLine(); HelpMarker(
+                "Exponent for the drop curve.\n"
+                "Higher = Steeper drop at range\n"
+                "Lower = Flatter trajectory"
+            );
+        }
+
+        SliderFloatWithInput("Gravity Scale", &Configs.Aimbot.GravityScale, 0.1f, 3.0f, "%.2f");
+        ImGui::SameLine(); HelpMarker(
+            "Multiplier on real gravity (9.81 m/s²).\n"
+            "1.0 = Standard physics gravity\n"
+            "< 1.0 = Less drop (bullets fly flatter)\n"
+            "> 1.0 = More drop\n"
+            "IMPORTANT: Reset to 1.0 after weapon formula update!"
+        );
+
+        // Auto-revert to Custom if user manually changed any ballistic slider
+        if (Configs.Aimbot.WeaponPreset > 0) {
+            if (Configs.Aimbot.BulletSpeed != prevBulletSpeed ||
+                Configs.Aimbot.DropRange != prevDropRange ||
+                Configs.Aimbot.AmmoType != prevAmmoType) {
+                Configs.Aimbot.WeaponPreset = 0; // Revert to Custom
+            }
+        }
+    }
     ImGui::EndGroup();
 
     ImGui::Separator();
 
-    // Kmbox connection
+    // Key binding
     ImGui::BeginGroup();
-    if (ImGui::Button("Connect To Kmbox")) {
-        kmbox::KmboxInitialize("");
-    }
-    ImGui::SameLine();
-    if (kmbox::connected) {
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Connected");
-    }
-    else {
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Not Connected");
-    }
+    HotKey("Aim Key", &Configs.Aimbot.Aimkey);
+    ImGui::SameLine(); HelpMarker("Key to activate aimbot");
     ImGui::EndGroup();
 
     ImGui::EndChild();

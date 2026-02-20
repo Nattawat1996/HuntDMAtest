@@ -15,6 +15,7 @@ public:
     int MaxDistance = 1500;
     ImVec4 TextColor = ImVec4(1.0f, 0.647058f, 0.0f, 1.0f);
     int FontSize = 16;
+    int ToggleKey = 0;
     
     void ToJsonColor(json* j, const std::string& name, ImVec4* color)
     {
@@ -43,6 +44,7 @@ public:
         j[ConfigName][LIT("Distance")] = Distance;
         j[ConfigName][LIT("MaxDistance")] = MaxDistance;
         j[ConfigName][LIT("FontSize")] = FontSize;
+        j[ConfigName][LIT("ToggleKey")] = ToggleKey;
         ToJsonColor(&j, LIT("TextColor"), &TextColor);
 
         return j;
@@ -61,6 +63,8 @@ public:
             FontSize = j[ConfigName][LIT("FontSize")];
         if (j[ConfigName].contains(LIT("MaxDistance")))
             MaxDistance = j[ConfigName][LIT("MaxDistance")];
+        if (j[ConfigName].contains(LIT("ToggleKey")))
+            ToggleKey = j[ConfigName][LIT("ToggleKey")];
         FromJsonColor(j, LIT("TextColor"), &TextColor);
     }
 };

@@ -11,6 +11,9 @@ public:
     }
     bool DrawRadar = true;
     bool RadarDrawSelf = false;
+    float RadarScale = 0.6493056f; // Default magic number
+    float RadarX = -0.001171875f;  // Default horizontal offset factor
+    float RadarY = 0.0090277f;     // Default vertical offset factor
     ImVec4 PlayerRadarColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
     ImVec4 EnemyRadarColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
     bool ShowFPS = true;
@@ -47,6 +50,9 @@ public:
         json j;
         j[ConfigName][LIT("DrawRadar")] = DrawRadar;
         j[ConfigName][LIT("RadarDrawSelf")] = RadarDrawSelf;
+        j[ConfigName][LIT("RadarScale")] = RadarScale;
+        j[ConfigName][LIT("RadarX")] = RadarX;
+        j[ConfigName][LIT("RadarY")] = RadarY;
         j[ConfigName][LIT("ShowFPS")] = ShowFPS;
         j[ConfigName][LIT("FpsFontSize")] = FpsFontSize;
         j[ConfigName][LIT("ShowObjectCount")] = ShowObjectCount;
@@ -70,6 +76,12 @@ public:
             DrawRadar = j[ConfigName][LIT("DrawRadar")];
         if (j[ConfigName].contains(LIT("RadarDrawSelf")))
             RadarDrawSelf = j[ConfigName][LIT("RadarDrawSelf")];
+        if (j[ConfigName].contains(LIT("RadarScale")))
+            RadarScale = j[ConfigName][LIT("RadarScale")];
+        if (j[ConfigName].contains(LIT("RadarX")))
+            RadarX = j[ConfigName][LIT("RadarX")];
+        if (j[ConfigName].contains(LIT("RadarY")))
+            RadarY = j[ConfigName][LIT("RadarY")];
         if (j[ConfigName].contains(LIT("ShowFPS")))
             ShowFPS = j[ConfigName][LIT("ShowFPS")];
         if (j[ConfigName].contains(LIT("FpsFontSize")))

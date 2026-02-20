@@ -43,10 +43,15 @@ std::shared_ptr<CheatFunction> UpdateCam = std::make_shared<CheatFunction>(1, []
 void InitializeESP()
 {
 	g_CacheManager.Start();
+	
+	// Always initialize keyboard for ESP toggles (reads game PC keyboard via DMA)
+	Keyboard::InitKeyboard();
+	Keyboard::StartPolling();
+	
+	// Only initialize KMBox for aimbot output (if aimbot is enabled)
 	if (enableAimBot)
 	{
-		Keyboard::InitKeyboard();
-		kmbox::KmboxInitialize("");
+		kmbox::KmboxInitialize(Configs.Aimbot.KmboxPort, Configs.Aimbot.KmboxBaudRate, (kmbox::DeviceType)Configs.Aimbot.KmboxDeviceType);
 	}
 }
 

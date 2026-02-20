@@ -14,6 +14,7 @@ public:
     bool Distance = true;
     ImVec4 TraitColor = ImVec4(0.0f, 1.0f, 0.866666f, 1.0f);
     int FontSize = 13;
+    int ToggleKey = 0;
 
     bool EnableBeastface = true;
     int BeastfaceDistance = 750;
@@ -149,6 +150,7 @@ public:
         j[ConfigName][LIT("Name")] = Name;
         j[ConfigName][LIT("Distance")] = Distance;
         j[ConfigName][LIT("FontSize")] = FontSize;
+        j[ConfigName][LIT("ToggleKey")] = ToggleKey;
         j[ConfigName][LIT("EnableBeastface")] = EnableBeastface;
         j[ConfigName][LIT("BeastfaceDistance")] = BeastfaceDistance;
         j[ConfigName][LIT("EnableBloodless")] = EnableBloodless;
@@ -237,6 +239,8 @@ public:
             Distance = j[ConfigName][LIT("Distance")];
         if (j[ConfigName].contains(LIT("FontSize")))
             FontSize = j[ConfigName][LIT("FontSize")];
+        if (j[ConfigName].contains(LIT("ToggleKey")))
+            ToggleKey = j[ConfigName][LIT("ToggleKey")];
         if (j[ConfigName].contains(LIT("EnableBeastface")))
             EnableBeastface = j[ConfigName][LIT("EnableBeastface")];
         if (j[ConfigName].contains(LIT("BeastfaceDistance")))

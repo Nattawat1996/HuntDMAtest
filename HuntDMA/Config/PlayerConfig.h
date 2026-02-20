@@ -27,11 +27,13 @@ public:
     float HeadCircleOffsetX = 0.0f;
     float HeadCircleOffsetY = 0.0f;
     bool DrawHealthBars = true;
+    bool Snaplines = false;
     ImVec4 FramesColor = ImVec4(0.988235f, 0.949019f, 0.019607f, 1.0f);
     ImVec4 FriendColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
     bool ShowPlayerList = true;
     int PlayerListFontSize = 15;
     ImVec4 PlayerListColor = ImVec4(0.807843f, 0.807843f, 0.807843f, 1.0f);
+    int ToggleKey = 0;
     
     void ToJsonColor(json* j, const std::string& name, ImVec4* color)
     {
@@ -72,8 +74,10 @@ public:
         j[ConfigName][LIT("HeadCircleOffsetX")] = HeadCircleOffsetX;
         j[ConfigName][LIT("HeadCircleOffsetY")] = HeadCircleOffsetY;
         j[ConfigName][LIT("DrawHealthBars")] = DrawHealthBars;
+        j[ConfigName][LIT("Snaplines")] = Snaplines;
         j[ConfigName][LIT("ShowPlayerList")] = ShowPlayerList;
         j[ConfigName][LIT("PlayerListFontSize")] = PlayerListFontSize;
+        j[ConfigName][LIT("ToggleKey")] = ToggleKey;
         ToJsonColor(&j, LIT("TextColor"), &TextColor);
         ToJsonColor(&j, LIT("FramesColor"), &FramesColor);
         ToJsonColor(&j, LIT("FriendColor"), &FriendColor);
@@ -119,10 +123,15 @@ public:
             HeadCircleOffsetY = j[ConfigName][LIT("HeadCircleOffsetY")];
         if (j[ConfigName].contains(LIT("DrawHealthBars")))
             DrawHealthBars = j[ConfigName][LIT("DrawHealthBars")];
+        if (j[ConfigName].contains(LIT("Snaplines")))
+            Snaplines = j[ConfigName][LIT("Snaplines")];
         if (j[ConfigName].contains(LIT("ShowPlayerList")))
             ShowPlayerList = j[ConfigName][LIT("ShowPlayerList")];
         if (j[ConfigName].contains(LIT("PlayerListFontSize")))
             PlayerListFontSize = j[ConfigName][LIT("PlayerListFontSize")];
+        if (j[ConfigName].contains(LIT("ToggleKey")))
+            ToggleKey = j[ConfigName][LIT("ToggleKey")];
+
         FromJsonColor(j, LIT("FriendColor"), &FriendColor);
         FromJsonColor(j, LIT("FramesColor"), &FramesColor);
         FromJsonColor(j, LIT("TextColor"), &TextColor);

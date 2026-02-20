@@ -1,18 +1,17 @@
 #pragma once
 #include "Memory.h"
+#include <chrono>
 struct RenderNode {
-	char pad_01[0x18]; // 0x00(0x10)
-	unsigned __int64 rnd_flags; // 0x10(0x08)
-	char pad_02[0x14]; // 0x18(0x14)
-	unsigned int silhouettes_param; // 0x2C(0x04)
-	char pad_03[0x8]; // 0x30(0x8)
-	float m_fWSMaxViewDist; //0x38(0x4)
+	char pad_01[0x10]; // 0x00(0x10)
+	unsigned int rnd_flags; // 0x10(0x04) — was uint64, changed to uint32 to avoid corrupting +0x14
+	char pad_02[0x11C]; // 0x14(0x11C)
+	unsigned int silhouettes_param; // 0x130(0x04) — moved from 0x2C
 };
 struct HealthBar {
-	char pad_01[0x18]; // 0x00(0x10)
-	unsigned int current_hp; // 0x10(0x04)
-	unsigned int regenerable_max_hp; // 0x14(0x04)
-	unsigned int current_max_hp; // 0x18(0x04)
+	char pad_01[0x18]; // 0x00(0x18)
+	unsigned int current_hp; // 0x18(0x04)
+	unsigned int regenerable_max_hp; // 0x1C(0x04)
+	unsigned int current_max_hp; // 0x20(0x04)
 };
 struct EntityNameStruct {
 	char name[100];
@@ -80,6 +79,7 @@ enum class EntityType : int
 	Medkit,
 
 	Event,
+	EventBoon,
 };
 struct Matrix4x4 {
 	float m[4][4];
@@ -128,11 +128,11 @@ private:
 	uint64_t TypeNamePointer2 = 0x0;
 	EntityNameStruct TypeName;
 
-	const uint64_t HpOffset1 = 0x192;  // Candidate B - Position 0x02838F5C
-	const uint64_t HpOffset2 = 0x20;  // Matches old HpOffset4
+	const uint64_t HpOffset1 = 0x198;
+	const uint64_t HpOffset2 = 0x20;
 	const uint64_t HpOffset3 = 0xC8;
 	const uint64_t HpOffset4 = 0x78;
-	const uint64_t HpOffset5 = 0x58;  // Confirmed correct
+	const uint64_t HpOffset5 = 0x58;
 	uint64_t HpPointer1 = 0x0;
 	uint64_t HpPointer2 = 0x0;
 	uint64_t HpPointer3 = 0x0;
@@ -155,6 +155,7 @@ private:
 	const uint64_t InternalFlagsOffset = 0x8;
 	uint32_t InternalFlags = 0x0;
 	bool Hidden = false;
+
 
 	bool Valid = true;
 
@@ -220,9 +221,10 @@ private:
 		{EntityType::Medkit, "Medkit"},
 
 		{EntityType::Event, "Event"},
+		{EntityType::EventBoon, "Event Boon"},
 	};
 public:
-	WorldEntity( uint64_t classptr);
+	WorldEntity(uint64_t classptr);
 	void SetUp(VMMDLL_SCATTER_HANDLE handle);
 	void SetUp1(VMMDLL_SCATTER_HANDLE handle);
 	void SetUp2(VMMDLL_SCATTER_HANDLE handle);
@@ -243,6 +245,15 @@ public:
 	void UpdateNode(VMMDLL_SCATTER_HANDLE handle);
 	void UpdateHealth(VMMDLL_SCATTER_HANDLE handle);
 	void UpdateBones();
+	void UpdateVelocity(); // Compute velocity from position delta
+
+	// Velocity tracking for prediction (public for aimbot access)
+	Vector3 Velocity;
+	Vector3 PreviousPosition;
+	std::chrono::steady_clock::time_point LastPositionTime;
+	std::chrono::steady_clock::time_point LastMoveTime;
+	bool HasPreviousPosition = false;
+
 	void UpdateExtraction(VMMDLL_SCATTER_HANDLE handle);
 	void UpdateClass(VMMDLL_SCATTER_HANDLE handle);
 	uint64_t GetClass() { return ClassAddress; }
@@ -256,9 +267,9 @@ public:
 
 	uint64_t SpecCountOffset1 = 0x198;
 	uint64_t SpecCountOffset2 = 0x20;
-	uint64_t SpecCountOffset3 = 0xC8;
-	uint64_t SpecCountOffset4 = 0x78;
-	uint64_t SpecCountOffset5 = 0x18;
+	uint64_t SpecCountOffset3 = 0xd0;
+	uint64_t SpecCountOffset4 = 0xE8;
+	uint64_t SpecCountOffset5 = 0x330;
 	uint64_t SpecCountPointer1 = 0x0;
 	uint64_t SpecCountPointer2 = 0x0;
 	uint64_t SpecCountPointer3 = 0x0;
@@ -266,4 +277,6 @@ public:
 	int SpecCount = 0;
 
 	static const uint32_t HIDDEN_FLAG = 0x8;
+public:
+	bool IsValid() const { return Valid; }
 };

@@ -22,6 +22,7 @@ public:
     ImVec4 TrapColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
     ImVec4 BarrelColor = ImVec4(0.960784f, 0.235294f, 0.0f, 1.0f);
     int FontSize = 13;
+    int ToggleKey = 0;
 
     void ToJsonColor(json* j, const std::string& name, ImVec4* color)
     {
@@ -50,6 +51,7 @@ public:
         j[ConfigName][LIT("Distance")] = Distance;
         j[ConfigName][LIT("MaxDistance")] = MaxDistance;
         j[ConfigName][LIT("FontSize")] = FontSize;
+        j[ConfigName][LIT("ToggleKey")] = ToggleKey;
         j[ConfigName][LIT("ShowBeartrap")] = ShowBeartrap;
         j[ConfigName][LIT("ShowTripmines")] = ShowTripmines;
         j[ConfigName][LIT("ShowDarksightDynamite")] = ShowDarksightDynamite;
@@ -75,6 +77,8 @@ public:
             FontSize = j[ConfigName][LIT("FontSize")];
         if (j[ConfigName].contains(LIT("MaxDistance")))
             MaxDistance = j[ConfigName][LIT("MaxDistance")];
+        if (j[ConfigName].contains(LIT("ToggleKey")))
+            ToggleKey = j[ConfigName][LIT("ToggleKey")];
         if (j[ConfigName].contains(LIT("ShowBeartrap")))
             ShowBeartrap = j[ConfigName][LIT("ShowBeartrap")];
         if (j[ConfigName].contains(LIT("ShowTripmines")))

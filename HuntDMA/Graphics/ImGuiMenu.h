@@ -59,6 +59,7 @@ public:
     void EndFrame();
 
     void HandleInput();
+    void InitializeHotkeys();  // Register keyboard hotkeys for ESP toggles
     bool IsInitialized() const { return initialized; }
 };
 

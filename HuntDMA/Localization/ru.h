@@ -107,6 +107,7 @@ namespace Localizations {
                     {"players.HeadCircleOffsetX", "Смещение круга головы X"},
                     {"players.HeadCircleOffsetY", "Смещение круга головы Y"},
                     {"players.DrawHealth", "Отображать полоски здоровья"},
+                    {"players.Snaplines", "Линии"},
                     {"chams.OutlineRed", "Красный контур"},
                     {"chams.OutlineBlue", "Синий контур"},
                     {"chams.OutlineYellow", "Жёлтый контур"},

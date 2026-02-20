@@ -101,6 +101,11 @@ void Environment::AssignMapType(char* name)
 void Environment::UpdateLocalPlayer()
 {
 	pGameClientNub = TargetProcess.Read<uint64_t>(pGame + pGameClientNubOffset);
+    if (pGameClientNub == 0) {
+        LOG_WARNING("UpdateLocalPlayer: pGameClientNub is 0. Skipping pointer update.");
+        return;
+    }
+
 	pGameClientChannel = TargetProcess.Read<uint64_t>(pGameClientNub + pGameClientChannelOffset);
 	localPlayerIdx = TargetProcess.Read<int>(pGameClientChannel + localPlayerIdxOffset);
 	LocalPlayer = TargetProcess.Read<uint64_t>(EntityList + (localPlayerIdx * sizeof(uint64_t)));
@@ -170,6 +175,7 @@ void Environment::UpdatePlayerList()
 		ent->UpdateHealth(handle);
 		ent->UpdateClass(handle);
 		ent->UpdateExtraction(handle);
+
 	}
 	Configs.Player.Chams = false;
 	TargetProcess.ExecuteReadScatter(handle);
@@ -273,6 +279,37 @@ void Environment::CacheEntities()
 	}
 	TargetProcess.ExecuteReadScatter(handle);
 	TargetProcess.CloseScatterHandle(handle);
+
+	// Fallback: Position-based detection with ClassName check
+	if (LocalPlayer == 0)
+	{
+		Vector3 cameraPos = CameraInstance->GetPosition();
+		float closestDist = 9999.0f;
+		std::shared_ptr<WorldEntity> closestEnt = nullptr;
+
+		for (std::shared_ptr<WorldEntity> ent : entitypointerlist)
+		{
+			if (ent == nullptr) continue;
+
+			// Ensure it's a Hunter before checking distance
+			if (ent->GetEntityClassName().name != nullptr && strstr(ent->GetEntityClassName().name, "HunterBasic") != NULL)
+			{
+				float dist = Vector3::Distance(ent->GetPosition(), cameraPos);
+				if (dist < 5.0f && dist < closestDist)
+				{
+					closestDist = dist;
+					closestEnt = ent;
+				}
+			}
+		}
+
+		if (closestEnt != nullptr)
+		{
+			LocalPlayer = closestEnt->GetClass();
+			// closestEnt->SetType(EntityType::LocalPlayer); // Will be set in the main loop below
+			LOG_INFO("Found LocalPlayer (HunterBasic)! Dist: %f (Ptr: 0x%llX)", closestDist, LocalPlayer);
+		}
+	}
 
 	// doing this after we have read class names fully to avoid reading things we don't need
 
@@ -448,13 +485,44 @@ void Environment::CacheEntities()
 		{
 			ent->SetType(EntityType::Unknown);
 
-			if (strstr(entityName, "currency_collection") != NULL)
+			// Check for Boons/XP first, even if they are posters
+			if (strstr(entityName, "bloodline_xp") != NULL || strstr(entityTypeName, "bloodline_xp") != NULL)
 			{
-				ent->SetType(EntityType::Pouch);
+				ent->SetType(EntityType::EventBoon);
+				ent->CompactTypeName = "XP";
+			}
+			else if (strstr(entityName, "hunter_xp") != NULL || strstr(entityTypeName, "hunter_xp") != NULL)
+			{
+				ent->SetType(EntityType::EventBoon);
+				ent->CompactTypeName = "XP"; 
+			}
+			else if (strstr(entityName, "pledge_mark_envelope") != NULL || strstr(entityTypeName, "pledge_mark_envelope") != NULL)
+			{
+				ent->SetType(EntityType::EventBoon);
+				ent->CompactTypeName = "Pledge";
+			}
+			else if (strstr(entityName, "event_points") != NULL || strstr(entityTypeName, "event_points") != NULL)
+			{
+				ent->SetType(EntityType::EventBoon);
+				ent->CompactTypeName = "Points";
+			}
+			else if (strstr(entityName, "four_shot_boon") != NULL || strstr(entityTypeName, "four_shot_boon") != NULL)
+			{
+				ent->SetType(EntityType::EventBoon);
+				ent->CompactTypeName = "4-Shot";
+			}
+			else if (strstr(entityName, "event_darksight_boon") != NULL || strstr(entityTypeName, "event_darksight_boon") != NULL)
+			{
+				ent->SetType(EntityType::EventBoon);
+				ent->CompactTypeName = "Darksight";
 			}
 			else if (strstr(entityName, "posters_collection") != NULL)
 			{
 				ent->SetType(EntityType::Poster);
+			}
+			else if (strstr(entityName, "currency_collection") != NULL)
+			{
+				ent->SetType(EntityType::Pouch);
 			}
 			else if (strstr(entityName, "workbench_upgrade_collection") != NULL)
 			{
@@ -463,12 +531,36 @@ void Environment::CacheEntities()
 
 			if (ent->GetType() == EntityType::Unknown)
 			{
-				LOG_ERROR(LIT("Unknown type: [%s]"), entityName);
+				// LOG_ERROR(LIT("Unknown type: [%s]"), entityName);
 				continue;
 			}
 
 			temppoilist.push_back(ent);
 			continue;
+		}
+
+		if ((std::string)(entityClassName) == "EventEnvelope")
+		{
+			if (strstr(entityName, "boon") != NULL || strstr(entityTypeName, "boon") != NULL)
+			{
+				ent->SetType(EntityType::EventBoon);
+
+				if (strstr(entityName, "bloodline_xp") != NULL || strstr(entityTypeName, "event_experience_boon") != NULL)
+					ent->CompactTypeName = "XP Boon";
+				else if (strstr(entityName, "pledge_mark_envelope") != NULL || strstr(entityTypeName, "pledge_mark_envelope") != NULL)
+					ent->CompactTypeName = "Pledge Mark";
+				else if (strstr(entityName, "event_points") != NULL || strstr(entityTypeName, "event_points") != NULL)
+					ent->CompactTypeName = "Points";
+				else if (strstr(entityName, "four_shot_boon") != NULL || strstr(entityTypeName, "four_shot_boon") != NULL)
+					ent->CompactTypeName = "4-Shot Boon";
+				else if (strstr(entityName, "event_darksight_boon") != NULL || strstr(entityTypeName, "event_darksight_boon") != NULL)
+					ent->CompactTypeName = "Darksight Boon";
+				else
+					ent->CompactTypeName = "Boon";
+
+				temppoilist.push_back(ent);
+				continue;
+			}
 		}
 		if ((std::string)(entityClassName) == "SmallLootGunOil")
 		{
@@ -570,6 +662,29 @@ void Environment::CacheEntities()
 			ent->SetType(EntityType::DarksightDynamite);
 			temptraplist.push_back(ent);
 			continue;
+		}
+		if ((std::string)(entityClassName) == "EventEnvelope")
+		{
+			if (strstr(entityName, "boon") != NULL || strstr(entityTypeName, "boon") != NULL)
+			{
+				ent->SetType(EntityType::EventBoon);
+
+				if (strstr(entityName, "bloodline_xp") != NULL || strstr(entityTypeName, "event_experience_boon") != NULL)
+					ent->CompactTypeName = "Bloodline XP";
+				else if (strstr(entityName, "pledge_mark_envelope") != NULL || strstr(entityTypeName, "pledge_mark_envelope") != NULL)
+					ent->CompactTypeName = "Pledge Mark";
+				else if (strstr(entityName, "event_points") != NULL || strstr(entityTypeName, "event_points") != NULL)
+					ent->CompactTypeName = "Event Points";
+				else if (strstr(entityName, "four_shot_boon") != NULL || strstr(entityTypeName, "four_shot_boon") != NULL)
+					ent->CompactTypeName = "Full Resupply";
+				else if (strstr(entityName, "event_darksight_boon") != NULL || strstr(entityTypeName, "event_darksight_boon") != NULL)
+					ent->CompactTypeName = "Darksight Boon";
+				else
+					ent->CompactTypeName = "Event Boon";
+
+				temppoilist.push_back(ent);
+				continue;
+			}
 		}
 		if ((std::string)(entityClassName) == "DestroyableReward")
 		{

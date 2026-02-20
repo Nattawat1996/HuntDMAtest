@@ -53,7 +53,7 @@ void WorldEntity::SetUp3(VMMDLL_SCATTER_HANDLE handle)
 	EntityName.name[99] = '\0';
 	TypeName.name[99] = '\0';
 	std::string typeName(TypeName.name);
-	if (typeName != "")
+	if (typeName != "" && CompactTypeName == "")
 		CompactTypeName = typeName.substr(typeName.find_last_of("./") + 1);
 	
 	TargetProcess.AddScatterReadRequest(handle, RenderNodePointer, &Node, sizeof(RenderNode));
@@ -96,19 +96,17 @@ void WorldEntity::WriteNode(VMMDLL_SCATTER_HANDLE handle, int colour, bool show)
 		convertedcolour = 0xFFFFFF00; // Filled White
 	if (RenderNodePointer != 0)
 	{
-	//	if(Node.rnd_flags == 284558360584 || Node.rnd_flags == 9680453640)
-		uint64_t none = 0x200000008;
-		uint64_t allmap = 0x80018;
-		uint64_t limit_distance = 0x80008;
-		float maxdistance = 5000;
+		uint32_t enableSilhouette = 0x18; // rnd_flags value with silhouette bit enabled
+		uint32_t disableSilhouette = 0x08; // rnd_flags default (no silhouette)
 		if (!show)
 		{
-			TargetProcess.AddScatterWriteRequest(handle, RenderNodePointer + 0x10, &none, sizeof(uint64_t));
+			TargetProcess.AddScatterWriteRequest(handle, RenderNodePointer + 0x10, &disableSilhouette, sizeof(uint32_t));
+			uint32_t nocolor = 0;
+			TargetProcess.AddScatterWriteRequest(handle, RenderNodePointer + 0x130, &nocolor, sizeof(uint32_t));
 			return;
 		}
-		TargetProcess.AddScatterWriteRequest(handle, RenderNodePointer + 0x10, &allmap, sizeof(uint64_t)); // change render flag to max distance, allows us to use chams at further distances as long as the model isn't culled.
-		TargetProcess.AddScatterWriteRequest(handle, RenderNodePointer + 0x2C, &convertedcolour, sizeof(uint32_t));
-		TargetProcess.AddScatterWriteRequest(handle, RenderNodePointer + 0x38, &maxdistance, sizeof(float));
+		TargetProcess.AddScatterWriteRequest(handle, RenderNodePointer + 0x10, &enableSilhouette, sizeof(uint32_t));
+		TargetProcess.AddScatterWriteRequest(handle, RenderNodePointer + 0x130, &convertedcolour, sizeof(uint32_t));
 	}
 }
 
@@ -207,4 +205,56 @@ void WorldEntity::UpdateClass(VMMDLL_SCATTER_HANDLE handle)
 bool WorldEntity::IsLocalPlayer()
 {
 	return EnvironmentInstance->GetLocalPlayerPointer() == GetClass();
+}
+
+void WorldEntity::UpdateVelocity()
+{
+	auto now = std::chrono::steady_clock::now();
+	
+	if (HasPreviousPosition)
+	{
+		Vector3 positionDelta = Position - PreviousPosition;
+		
+		if (!positionDelta.IsZero())
+		{
+			// Position changed — a new DMA read arrived
+			float deltaTime = std::chrono::duration<float>(now - LastPositionTime).count();
+			
+			if (deltaTime > 0.005f && deltaTime < 1.0f)
+			{
+				Vector3 instantVelocity = positionDelta * (1.0f / deltaTime);
+				
+				float speed = instantVelocity.Length();
+				if (speed < 15.0f) // Filter teleportation / jitter
+				{
+					Velocity = Vector3::Lerp(Velocity, instantVelocity, 0.85f);
+				}
+			}
+			
+			// Only update reference when position actually changed
+			PreviousPosition = Position;
+			LastPositionTime = now;
+			LastMoveTime = now;
+		}
+		else
+		{
+			// Position unchanged — DMA hasn't delivered a new read yet
+			// Keep current velocity for a grace period, then decay
+			float idleTime = std::chrono::duration<float>(now - LastMoveTime).count();
+			if (idleTime > 0.2f)
+			{
+				Velocity = Velocity * 0.85f;
+				if (Velocity.Length() < 0.1f)
+					Velocity = Vector3::Zero();
+			}
+		}
+	}
+	else
+	{
+		// First call — initialize reference point
+		PreviousPosition = Position;
+		LastPositionTime = now;
+		LastMoveTime = now;
+		HasPreviousPosition = true;
+	}
 }

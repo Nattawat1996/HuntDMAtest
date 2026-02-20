@@ -15,6 +15,23 @@ std::shared_ptr<CheatFunction> UpdateBosses = std::make_shared<CheatFunction>(5,
 	EnvironmentInstance->UpdateBossesList();
 });
 
+// Helper function to get health bar color based on HP percentage
+static ImVec4 GetHealthBarColor(unsigned int currentHp, unsigned int maxHp)
+{
+	if (maxHp == 0) return ImVec4(0.5f, 0.5f, 0.5f, 1.0f); // Gray for invalid
+	
+	float percentage = (float)currentHp / (float)maxHp;
+	
+	if (percentage > 0.75f) // 100%-75% = Green
+		return ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
+	else if (percentage > 0.50f) // 75%-50% = Yellow
+		return ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
+	else if (percentage > 0.25f) // 50%-25% = Orange
+		return ImVec4(1.0f, 0.647f, 0.0f, 1.0f);
+	else // 25%-0% = Red
+		return ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+}
+
 void DrawBossesEsp()
 {
 	if (EnvironmentInstance == nullptr)
@@ -63,14 +80,37 @@ void DrawPlayersEsp()
 	if (EnvironmentInstance->GetObjectCount() < 10)
 		return;
 	
-	if (Configs.Player.Enable || Configs.Player.DrawFrames)
+	if (Configs.Player.Enable || Configs.Player.DrawFrames || Configs.Player.Snaplines)
 	{
 		std::vector<std::shared_ptr<WorldEntity>> templist = EnvironmentInstance->GetPlayerList();
 		if (templist.size() == 0)
 			return;
+
+		Vector2 center;
+		if (Configs.General.CrosshairLowerPosition)
+			center = Vector2(ESPRenderer::GetScreenWidth() * 0.5f, ESPRenderer::GetScreenHeight() * 0.6f);
+		else
+			center = Vector2(ESPRenderer::GetScreenWidth() * 0.5f, ESPRenderer::GetScreenHeight() * 0.5f);
+
+		// 1. Collect positions of confirmed DEAD entities (Hunter_Loot only)
+		std::vector<Vector3> deadPositions;
+		for (std::shared_ptr<WorldEntity> ent : templist)
+		{
+			// Strictly check for Loot Box class name to avoid self-referencing bug
+			if (ent != nullptr && strstr(ent->GetEntityClassName().name, "Hunter_Loot"))
+			{
+				deadPositions.push_back(ent->GetPosition());
+				ent->SetType(EntityType::DeadPlayer); // Ensure loot boxes are always Dead
+			}
+		}
+
 		for (std::shared_ptr<WorldEntity> ent : templist)
 		{
 			if (ent == nullptr || ent->GetType() == EntityType::LocalPlayer)
+				continue;
+
+			// Skip Hunter_Loot entities (they are used for detection only, not to be drawn)
+			if (strstr(ent->GetEntityClassName().name, "Hunter_Loot"))
 				continue;
 
 			auto playerPos = ent->GetPosition();
@@ -81,23 +121,45 @@ void DrawPlayersEsp()
 			if (!ent->GetValid() || ent->IsHidden()) // Has extracted
 				continue;
 
-			auto isDead = false;
-			if (ent->GetType() != EntityType::FriendlyPlayer &&
-				(!IsValidHP(ent->GetHealth().current_hp) ||
-					!IsValidHP(ent->GetHealth().current_max_hp) ||
-					!IsValidHP(ent->GetHealth().regenerable_max_hp)))
+			// Check if it is a Player Model
+			if (strstr(ent->GetEntityClassName().name, "HunterBasic"))
 			{
-				ent->SetType(EntityType::DeadPlayer);
-				isDead = true;
-			}
-			else
-			{
+				// 1. Determine team (Friend/Enemy) based on silhouettes_param
 				if (ent->GetRenderNode().silhouettes_param == 0x8CD2FF || ent->GetRenderNode().silhouettes_param == 0x3322eeff)
 				{
 					ent->SetType(EntityType::FriendlyPlayer);
 				}
-				else ent->SetType(EntityType::EnemyPlayer);
+				else
+				{
+					ent->SetType(EntityType::EnemyPlayer);
+				}
+
+				// 2. Check if dead based on HP (primary method)
+				auto health = ent->GetHealth();
+				if (health.current_hp == 0 && IsValidHP(health.current_max_hp))
+				{
+					ent->SetType(EntityType::DeadPlayer);
+				}
+				// 3. Fallback: proximity to loot box (for cases where HP read fails)
+				else
+				{
+					for (const auto& dPos : deadPositions)
+					{
+						if (Vector3::Distance(playerPos, dPos) < 1.0f) // 1 meter tolerance
+						{
+							ent->SetType(EntityType::DeadPlayer);
+							break;
+						}
+					}
+				}
 			}
+
+			bool isDead = (ent->GetType() == EntityType::DeadPlayer);
+
+			// HP-based dead detection now active
+			
+			// 3. Set Teams logic (Redundant but keeps existing structure safe)
+			// (Already handled in reset step above)
 
 			if (!Configs.Player.ShowDead && isDead)
 				continue;
@@ -113,7 +175,7 @@ void DrawPlayersEsp()
 
 			tempPos.z = playerPos.z + 1.7f;
 			Vector2 headPos;
-			if (Configs.Player.DrawHeadInFrames)
+			if (Configs.Player.DrawHeadInFrames || Configs.Player.Snaplines)
 			{
 				headPos = CameraInstance->WorldToScreen(tempPos, false);
 				if (headPos.IsZero())
@@ -127,6 +189,12 @@ void DrawPlayersEsp()
 				uppderFramePos = CameraInstance->WorldToScreen(tempPos, false);
 				if (uppderFramePos.IsZero())
 					continue;
+			}
+
+			if (Configs.Player.Snaplines && !headPos.IsZero())
+			{
+				auto colour = ent->GetType() == EntityType::FriendlyPlayer ? Configs.Player.FriendColor : Configs.Player.FramesColor;
+				ESPRenderer::DrawLine(ImVec2(center.x, center.y), ImVec2(headPos.x, headPos.y), colour, 1.0f);
 			}
 
 			tempPos.z = playerPos.z + 2.1f;
@@ -147,70 +215,17 @@ void DrawPlayersEsp()
 				offset = normal / (2.0f * 2);
 			}
 
-			if (Configs.Player.DrawFrames && ent->GetType() != EntityType::FriendlyPlayer)
+			if (Configs.Player.DrawFrames && ent->GetType() != EntityType::FriendlyPlayer && !isDead)
 			{
-				Vector2 A1 = feetPos + offset;
-				Vector2 A2 = feetPos - offset;
-				Vector2 B1 = uppderFramePos + offset;
-				Vector2 B2 = uppderFramePos - offset;
-
-				auto colour = ent->GetType() == EntityType::FriendlyPlayer ? Configs.Player.FriendColor : Configs.Player.FramesColor;
-
-				ESPRenderer::DrawLine(
-					ImVec2(A1.x, A1.y),
-					ImVec2(A2.x, A2.y),
-					colour,
-					1
-				);
-				ESPRenderer::DrawLine(
-					ImVec2(A2.x, A2.y),
-					ImVec2(B2.x, B2.y),
-					colour,
-					1
-				);
-				ESPRenderer::DrawLine(
-					ImVec2(B2.x, B2.y),
-					ImVec2(B1.x, B1.y),
-					colour,
-					1
-				);
-				ESPRenderer::DrawLine(
-					ImVec2(B1.x, B1.y),
-					ImVec2(A1.x, A1.y),
-					colour,
-					1
-				);
-
-				if (Configs.Player.DrawHeadInFrames)
+				// Determine top position based on state (Alive = 2.0m, Dead/Loot = 1.85m)
+				Vector2 topPos = uppderFramePos;
+				if (isDead)
 				{
-					// Calculate radius based on the frame width
-					float headRadius = Vector2::Distance(headPos + offset, headPos - offset) / Configs.Player.HeadCircleSize;
-					
-					// Apply offsets to head position
-					Vector2 adjustedHeadPos = Vector2(
-						headPos.x + Configs.Player.HeadCircleOffsetX,
-						headPos.y + Configs.Player.HeadCircleOffsetY
-					);
-					
-					// Draw circle around head
-					ESPRenderer::DrawCircle(
-						ImVec2(adjustedHeadPos.x, adjustedHeadPos.y),
-						headRadius,
-						colour,
-						1.5f,
-						false
-					);
+					auto tempPosTop = playerPos;
+					tempPosTop.z = playerPos.z + 1.85f;
+					topPos = CameraInstance->WorldToScreen(tempPosTop, false);
 				}
-			}
 
-			// Draw bounding box for dead players (loot)
-			if (Configs.Player.DrawFrames && isDead)
-			{
-				// Calculate box dimensions for dead player loot
-				auto tempPosTop = playerPos;
-				tempPosTop.z = playerPos.z + 1.85f; // Adjusted height to fit loot model
-				Vector2 topPos = CameraInstance->WorldToScreen(tempPosTop, false);
-				
 				if (!topPos.IsZero())
 				{
 					Vector2 v = topPos - feetPos;
@@ -223,11 +238,11 @@ void DrawPlayersEsp()
 					Vector2 B1 = topPos + offset;   // Top-left
 					Vector2 B2 = topPos - offset;   // Top-right
 
-					auto colour = Configs.Player.FramesColor;
+					auto colour = ent->GetType() == EntityType::FriendlyPlayer ? Configs.Player.FriendColor : Configs.Player.FramesColor;
 
 					// Corner bracket length (20% of box dimensions)
-					float cornerLength = segmentLength * 0.2f;
-					float cornerWidth = Vector2::Distance(A1, A2) * 0.2f;
+					// float cornerLength = segmentLength * 0.2f; // Unused variable warning fix
+					// float cornerWidth = Vector2::Distance(A1, A2) * 0.2f;
 
 					// Bottom-left corner (L-shape)
 					Vector2 BL_horizontal = Vector2(A1.x + (A2.x - A1.x) * 0.2f, A1.y + (A2.y - A1.y) * 0.2f);
@@ -252,6 +267,27 @@ void DrawPlayersEsp()
 					Vector2 TR_vertical = Vector2(B2.x + (A2.x - B2.x) * 0.2f, B2.y + (A2.y - B2.y) * 0.2f);
 					ESPRenderer::DrawLine(ImVec2(B2.x, B2.y), ImVec2(TR_horizontal.x, TR_horizontal.y), colour, 1.5f);
 					ESPRenderer::DrawLine(ImVec2(B2.x, B2.y), ImVec2(TR_vertical.x, TR_vertical.y), colour, 1.5f);
+
+					if (Configs.Player.DrawHeadInFrames)
+					{
+						// Calculate radius based on the frame width
+						float headRadius = Vector2::Distance(headPos + offset, headPos - offset) / Configs.Player.HeadCircleSize;
+						
+						// Apply offsets to head position
+						Vector2 adjustedHeadPos = Vector2(
+							headPos.x + Configs.Player.HeadCircleOffsetX,
+							headPos.y + Configs.Player.HeadCircleOffsetY
+						);
+						
+						// Draw circle around head
+						ESPRenderer::DrawCircle(
+							ImVec2(adjustedHeadPos.x, adjustedHeadPos.y),
+							headRadius,
+							colour,
+							1.5f,
+							false
+						);
+					}
 				}
 			}
 
@@ -268,10 +304,23 @@ void DrawPlayersEsp()
 				Vector2 currentMaxHpPos = Vector2(currentMaxHp * Health2.x + (1 - currentMaxHp) * Health1.x, currentMaxHp * Health2.y + (1 - currentMaxHp) * Health1.y);
 				Vector2 potentialMaxHpPos = Vector2(potentialMaxHp * Health2.x + (1 - potentialMaxHp) * Health1.x, potentialMaxHp * Health2.y + (1 - potentialMaxHp) * Health1.y);
 
+				// Determine health bar color based on HP percentage
+				ImVec4 healthColor;
+				if (ent->GetType() == EntityType::FriendlyPlayer)
+				{
+					// Friendly players: use blue or dynamic color based on config
+					healthColor = ImVec4(0.058823f, 0.407843f, 0.909803f, 1.0f); // Blue
+				}
+				else
+				{
+					// Enemy players: use dynamic color based on HP percentage
+					healthColor = GetHealthBarColor(health.current_hp, health.regenerable_max_hp);
+				}
+				
 				ESPRenderer::DrawLine(                             // current health
 					ImVec2(Health1.x, Health1.y),
 					ImVec2(currentHpPos.x, currentHpPos.y),
-					ent->GetType() == EntityType::FriendlyPlayer ? ImVec4(0.058823f, 0.407843f, 0.909803f, 1.0f) : ImVec4(0.784313f, 0.039215f, 0.039215f, 1.0f),
+					healthColor,
 					lineHeight
 				);
 				ESPRenderer::DrawLine(                             // regenerable black health

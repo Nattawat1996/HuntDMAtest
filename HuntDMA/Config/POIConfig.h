@@ -22,8 +22,10 @@ public:
     bool ShowGunOil = false;
     bool ShowClues = false;
     bool ShowSeasonalDestructibles = false;
+    bool ShowBoons = true;
     ImVec4 TextColor = ImVec4(0.0f, 1.0f, 0.866666f, 1.0f);
     int FontSize = 12;
+    int ToggleKey = 0;
     
     void ToJsonColor(json* j, const std::string& name, ImVec4* color)
     {
@@ -52,6 +54,7 @@ public:
         j[ConfigName][LIT("Distance")] = Distance;
         j[ConfigName][LIT("MaxDistance")] = MaxDistance;
         j[ConfigName][LIT("FontSize")] = FontSize;
+        j[ConfigName][LIT("ToggleKey")] = ToggleKey;
         j[ConfigName][LIT("ShowResupplyStation")] = ShowResupplyStation;
         j[ConfigName][LIT("ShowExtraction")] = ShowExtraction;
         j[ConfigName][LIT("ShowCashRegisters")] = ShowCashRegisters;
@@ -61,7 +64,9 @@ public:
         j[ConfigName][LIT("ShowGunOil")] = ShowGunOil;
         j[ConfigName][LIT("ShowClues")] = ShowClues;
         j[ConfigName][LIT("ShowSeasonalDestructibles")] = ShowSeasonalDestructibles;
+        j[ConfigName][LIT("ShowBoons")] = ShowBoons;
         ToJsonColor(&j, LIT("TextColor"), &TextColor);
+        ToJsonColor(&j, LIT("BoonColor"), &BoonColor);
 
         return j;
     }
@@ -79,6 +84,8 @@ public:
             FontSize = j[ConfigName][LIT("FontSize")];
         if (j[ConfigName].contains(LIT("MaxDistance")))
             MaxDistance = j[ConfigName][LIT("MaxDistance")];
+        if (j[ConfigName].contains(LIT("ToggleKey")))
+            ToggleKey = j[ConfigName][LIT("ToggleKey")];
         if (j[ConfigName].contains(LIT("ShowResupplyStation")))
             ShowResupplyStation = j[ConfigName][LIT("ShowResupplyStation")];
         if (j[ConfigName].contains(LIT("ShowExtraction")))
@@ -97,7 +104,12 @@ public:
             ShowClues = j[ConfigName][LIT("ShowClues")];
         if (j[ConfigName].contains(LIT("ShowSeasonalDestructibles")))
             ShowSeasonalDestructibles = j[ConfigName][LIT("ShowSeasonalDestructibles")];
+        if (j[ConfigName].contains(LIT("ShowBoons")))
+            ShowBoons = j[ConfigName][LIT("ShowBoons")];
         FromJsonColor(j, LIT("TextColor"), &TextColor);
+        FromJsonColor(j, LIT("BoonColor"), &BoonColor);
     }
+    
+    ImVec4 BoonColor = ImVec4(1.0f, 0.0f, 1.0f, 1.0f); // Default Magenta
 };
 
