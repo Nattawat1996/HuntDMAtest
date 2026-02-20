@@ -10,6 +10,10 @@
 
 std::shared_ptr<CheatFunction> UpdatePlayers = std::make_shared<CheatFunction>(1, [] {
 	EnvironmentInstance->UpdatePlayerList();
+	// Update velocity for all players (DMA-rate limited by time guard in UpdateVelocity itself)
+	for (auto& player : EnvironmentInstance->GetPlayerList()) {
+		if (player) player->UpdateVelocity();
+	}
 });
 std::shared_ptr<CheatFunction> UpdateBosses = std::make_shared<CheatFunction>(5, [] {
 	EnvironmentInstance->UpdateBossesList();

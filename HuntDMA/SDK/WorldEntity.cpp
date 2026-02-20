@@ -210,7 +210,18 @@ bool WorldEntity::IsLocalPlayer()
 void WorldEntity::UpdateVelocity()
 {
 	auto now = std::chrono::steady_clock::now();
-	
+
+	// ── Time guard: skip if called faster than 16ms ───────────────────────
+	// DMA scatter reads complete at most at ~60Hz, so calling faster than
+	// 16ms guarantees no new position data — short-circuit to avoid
+	// redundant chrono arithmetic every render frame.
+	if (HasPreviousPosition)
+	{
+		float timeSinceLast = std::chrono::duration<float>(now - LastPositionTime).count();
+		if (timeSinceLast < 0.016f)
+			return;
+	}
+
 	if (HasPreviousPosition)
 	{
 		Vector3 positionDelta = Position - PreviousPosition;
@@ -258,3 +269,4 @@ void WorldEntity::UpdateVelocity()
 		HasPreviousPosition = true;
 	}
 }
+

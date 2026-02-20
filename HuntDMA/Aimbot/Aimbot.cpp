@@ -1,6 +1,8 @@
 #include "Pch.h"
 #include <cmath>
 #include <algorithm>
+#include <vector>
+#include <utility>
 #include "Aimbot.h"
 #include "PlayerEsp.h"
 #include "Globals.h"
@@ -13,6 +15,10 @@
 #include "ESPRenderer.h"
 #include "WeaponPresets.h"
 
+// =============================================================================
+//  Helpers
+// =============================================================================
+
 static Vector2 GetCenterOfScreen()
 {
 	if (Configs.General.CrosshairLowerPosition)
@@ -21,112 +27,127 @@ static Vector2 GetCenterOfScreen()
 		return Vector2(ESPRenderer::GetScreenWidth() * 0.5f, ESPRenderer::GetScreenHeight() * 0.5f);
 }
 
-// Helper function to get the predicted head screen position
-static Vector2 GetPredictedHeadScreenPosition(std::shared_ptr<WorldEntity> entity)
-{
-	if (!entity || !CameraInstance)
-		return Vector2::Zero();
-	
-	// Calculate head position (base position + 1.7m height)
-	Vector3 headPos = entity->GetPosition();
-	headPos.z += 1.7f;
-	
-	// Apply prediction if enabled
-	if (Configs.Aimbot.Prediction)
-	{
-		// Update velocity tracking
-		entity->UpdateVelocity();
-		
-		float distance = Vector3::Distance(CameraInstance->GetPosition(), headPos);
-		
-		// Look up weapon data from the weapons map
-		float bulletSpeed = Configs.Aimbot.BulletSpeed;
-		float drag = 0.0f;
-		float ammo = 0.0f;
-		int droprange = (int)Configs.Aimbot.DropRange;
-		float action = 0.0f;
-		float slot = 0.0f;
-		bool weaponFound = false;
-		std::string weaponUsed = "Custom";
-		
-		if (Configs.Aimbot.WeaponPreset > 0) {
-			std::string inputWeapon = weaponNames[Configs.Aimbot.WeaponPreset - 1];
-			auto it = weapons.find(inputWeapon);
-			if (it != weapons.end()) {
-				const Weapon& weapon = it->second;
-				bulletSpeed = weapon.muzzleVelocity;
-				drag = AmmoDrag[weapon.ammoType];
-				ammo = DropAdd.count(weapon.ammoType) ? DropAdd[weapon.ammoType] : 0.0f;
-				droprange = weapon.dropRange;
-				action = ActionMult[weapon.action];
-				slot = barrelMult[weapon.slot];
-				weaponFound = true;
-				weaponUsed = inputWeapon;
-			} else {
-				weaponUsed = inputWeapon + " (NOT FOUND!)";
-			}
-		}
-		
-		if (bulletSpeed > 0.0f && distance > 0.0f)
-		{
-			// Composite drop multiplier from ammo, action, and slot
-			float predropmult = 1.0f + ammo + action + slot;
-			float dropmult = std::max(predropmult, 0.25f);
-			
-			float travelTime = distance / bulletSpeed;
-			
-			// Predict position with drag dampening on velocity
-			Vector3 predicted = entity->Velocity * (travelTime * Configs.Aimbot.PredictionScale * (1.0f - drag));
-			
-			// Bullet drop: 0.5 * gravity * t^2 * dropmult (gravity = 9.81 * GravityScale)
-			float gravity = 9.81f * Configs.Aimbot.GravityScale;
-			float drop = (0.5f * gravity * travelTime * travelTime) * dropmult;
-			predicted.z += drop;
-			
-			// Debug logging (throttled to once per second)
-			static auto lastLogTime = std::chrono::system_clock::now();
-			auto now = std::chrono::system_clock::now();
-			if (now - lastLogTime > std::chrono::seconds(1)) {
-				LOG_INFO("[Aimbot] Weapon: %s | Preset: %d | Found: %s",
-					weaponUsed.c_str(), Configs.Aimbot.WeaponPreset, weaponFound ? "YES" : "NO");
-				LOG_INFO("[Aimbot] Speed=%.1f | Drag=%.2f | DropAdd=%.2f | Action=%.2f | Slot=%.2f | DropRange=%d",
-					bulletSpeed, drag, ammo, action, slot, droprange);
-				LOG_INFO("[Aimbot] Dist=%.1fm | TravelT=%.3fs | DropMult=%.2f | Gravity=%.2f | Drop=%.3fm",
-					distance, travelTime, dropmult, gravity, drop);
-				lastLogTime = now;
-			}
-			
-			headPos = headPos + predicted;
-		}
-	}
-	
-	// Convert to screen space
-	Vector2 screenPos = CameraInstance->WorldToScreen(headPos);
-	
-	// Apply screen space offsets to match the drawn head circle center
-	screenPos.x += Configs.Player.HeadCircleOffsetX;
-	screenPos.y += Configs.Player.HeadCircleOffsetY;
-	
-	return screenPos;
-}
-
-// Lightweight head screen position (no prediction/velocity — safe for target selection)
+// Lightweight head screen position — no prediction, safe for target selection & sticky check
 static Vector2 GetHeadScreenPosition(std::shared_ptr<WorldEntity> entity)
 {
 	if (!entity || !CameraInstance)
 		return Vector2::Zero();
-	
+
 	Vector3 headPos = entity->GetPosition();
 	headPos.z += 1.7f;
-	
+
 	Vector2 screenPos = CameraInstance->WorldToScreen(headPos);
 	screenPos.x += Configs.Player.HeadCircleOffsetX;
 	screenPos.y += Configs.Player.HeadCircleOffsetY;
-	
 	return screenPos;
 }
 
-// Optimized sort: uses std::sort with cached positions (avoids redundant WorldToScreen calls)
+// =============================================================================
+//  Cached ballistic parameters — resolved once when WeaponPreset changes,
+//  not on every frame. weapons.find() is O(log N) string compare → too slow.
+// =============================================================================
+
+struct BallisticCache
+{
+	int     LastPreset  = -1;   // sentinel: force update on first use
+	float   BulletSpeed = 500.0f;
+	float   Drag        = 0.0f;
+	float   DropMult    = 1.0f;
+	bool    Valid       = false;
+};
+static BallisticCache gBallistic;
+
+static void RefreshBallisticCache(int presetIndex)
+{
+	if (gBallistic.LastPreset == presetIndex) return;  // nothing changed
+
+	gBallistic.LastPreset  = presetIndex;
+	gBallistic.BulletSpeed = Configs.Aimbot.BulletSpeed;
+	gBallistic.Drag        = 0.0f;
+	gBallistic.DropMult    = 1.0f;
+	gBallistic.Valid       = false;
+
+	if (presetIndex > 0)
+	{
+		const char* wName = weaponNames[presetIndex - 1];
+		auto it = weapons.find(wName);
+		if (it != weapons.end())
+		{
+			const Weapon& w        = it->second;
+			gBallistic.BulletSpeed = w.muzzleVelocity;
+			gBallistic.Drag        = AmmoDrag[w.ammoType];
+
+			float dropAdd  = DropAdd.count(w.ammoType) ? DropAdd[w.ammoType] : 0.0f;
+			float actMult  = ActionMult[w.action];
+			float barMult  = barrelMult[w.slot];
+			float pre      = 1.0f + dropAdd + actMult + barMult;
+			gBallistic.DropMult = std::max(pre, 0.25f);
+			gBallistic.Valid    = true;
+		}
+	}
+}
+
+
+static Vector2 GetPredictedHeadScreenPosition(std::shared_ptr<WorldEntity> entity)
+{
+	if (!entity || !CameraInstance)
+		return Vector2::Zero();
+
+	Vector3 headPos = entity->GetPosition();
+	headPos.z += 1.7f;
+
+	if (Configs.Aimbot.Prediction)
+	{
+		// NOTE: UpdateVelocity() called in UpdatePlayers->Execute() — not here.
+
+		float distance = Vector3::Distance(CameraInstance->GetPosition(), headPos);
+
+		// ── Resolve ballistic parameters (cached — only recalculated when preset changes) ──
+		RefreshBallisticCache(Configs.Aimbot.WeaponPreset);
+		// Also update cache if manual BulletSpeed changed while preset==0
+		if (Configs.Aimbot.WeaponPreset == 0)
+			gBallistic.BulletSpeed = Configs.Aimbot.BulletSpeed;
+
+		float bulletSpeed = gBallistic.BulletSpeed;
+		float drag        = gBallistic.Drag;
+		float dropMult    = gBallistic.DropMult;
+
+		if (bulletSpeed > 0.0f && distance > 0.0f)
+		{
+			float travelTime = distance / bulletSpeed;
+
+			// ── Movement lead ──────────────────────────────────────────────
+			float dragFactor = std::max(1.0f - drag * distance, 0.1f);
+			Vector3 offset   = entity->Velocity * (travelTime * Configs.Aimbot.PredictionScale * dragFactor);
+
+			// ── Bullet drop  s = 0.5 * g * t^2 * dropMult ────────────────
+			float gravity = 9.81f * Configs.Aimbot.GravityScale;
+			float drop    = 0.5f * gravity * travelTime * travelTime * dropMult;
+			offset.z     += drop;
+
+			headPos = headPos + offset;
+		}
+	}
+
+
+	Vector2 screenPos = CameraInstance->WorldToScreen(headPos);
+	screenPos.x += Configs.Player.HeadCircleOffsetX;
+	screenPos.y += Configs.Player.HeadCircleOffsetY;
+	return screenPos;
+}
+
+// =============================================================================
+//  Target Selection
+//  O(N) WorldToScreen calls (cached before sort) — comparator is O(1).
+// =============================================================================
+
+// Per-candidate scoring cache — filled once before std::sort
+struct ScoredEntity
+{
+	std::shared_ptr<WorldEntity> Entity;
+	float Score;
+};
+
 static void SortPlayers(std::vector<std::shared_ptr<WorldEntity>>& entities)
 {
 	if (entities.empty() || !CameraInstance) return;
@@ -134,196 +155,222 @@ static void SortPlayers(std::vector<std::shared_ptr<WorldEntity>>& entities)
 	Vector2 center = GetCenterOfScreen();
 	Vector3 camPos = CameraInstance->GetPosition();
 
-	std::sort(entities.begin(), entities.end(),
-		[&center, &camPos](const std::shared_ptr<WorldEntity>& a, const std::shared_ptr<WorldEntity>& b)
+	// Pre-score every entity O(N) — WorldToScreen called once per entity max
+	std::vector<ScoredEntity> scored;
+	scored.reserve(entities.size());
+
+	for (auto& e : entities)
+	{
+		if (!e) continue;
+
+		float score = 0.0f;
+		if (Configs.Aimbot.Priority == 0) // Distance
 		{
-			if (Configs.Aimbot.Priority == 0) // Distance
-			{
-				return Vector3::Distance(camPos, a->GetPosition()) < Vector3::Distance(camPos, b->GetPosition());
-			}
-			else if (Configs.Aimbot.Priority == 1) // Crosshair
-			{
-				return Vector2::Distance(center, CameraInstance->WorldToScreen(a->GetPosition()))
-					 < Vector2::Distance(center, CameraInstance->WorldToScreen(b->GetPosition()));
-			}
-			else // Both
-			{
-				float distA = Vector3::Distance(camPos, a->GetPosition());
-				float distB = Vector3::Distance(camPos, b->GetPosition());
-				float scrA = Vector2::Distance(center, CameraInstance->WorldToScreen(a->GetPosition()));
-				float scrB = Vector2::Distance(center, CameraInstance->WorldToScreen(b->GetPosition()));
-				return (distA + scrA) < (distB + scrB);
-			}
+			score = Vector3::Distance(camPos, e->GetPosition());
 		}
-	);
+		else // Crosshair (1) or Both (2) — need screen pos
+		{
+			Vector2 scrPos  = CameraInstance->WorldToScreen(e->GetPosition()); // called ONCE
+			float   scrDist = Vector2::Distance(center, scrPos);
+
+			if (Configs.Aimbot.Priority == 1)
+				score = scrDist;
+			else // Both
+				score = Vector3::Distance(camPos, e->GetPosition()) + scrDist;
+		}
+		scored.push_back({ e, score });
+	}
+
+	// O(1) comparator — no WorldToScreen inside
+	std::sort(scored.begin(), scored.end(),
+		[](const ScoredEntity& a, const ScoredEntity& b) { return a.Score < b.Score; });
+
+	for (size_t i = 0; i < entities.size(); ++i)
+		entities[i] = scored[i].Entity;
 }
+
+// =============================================================================
+//  Sticky target & target acquisition
+// =============================================================================
 
 std::shared_ptr<WorldEntity> AimbotTarget;
 
 bool StickTarget()
 {
-	Vector2 Centerofscreen = GetCenterOfScreen();
-	if (CameraInstance == nullptr)
-		return false;
-	if (EnvironmentInstance == nullptr)
-		return false;
-	if (AimbotTarget== nullptr)
-		return false;	
-	if (!AimbotTarget->GetValid())
-		return false;
+	Vector2 center = GetCenterOfScreen();
+	if (!CameraInstance || !EnvironmentInstance || !AimbotTarget) return false;
+	if (!AimbotTarget->GetValid()) return false;
 	if (Vector3::Distance(CameraInstance->GetPosition(), AimbotTarget->GetPosition()) > Configs.Aimbot.MaxDistance)
 		return false;
 	if (AimbotTarget->GetType() == EntityType::EnemyPlayer && !Configs.Aimbot.TargetPlayers)
 		return false;
-	// Lightweight FOV check (no prediction/velocity — that's only in the main Aimbot() loop)
-	Vector2 headScreenPos = GetHeadScreenPosition(AimbotTarget);
-	if (headScreenPos == Vector2::Zero())
-		return false;
-	// Use wider FOV for sticky target (1.5x) to prevent losing target during movement
-	if (Vector2::Distance(headScreenPos, Centerofscreen) > Configs.Aimbot.FOV * 1.5f)
-		return false;
+
+	Vector2 headPos = GetHeadScreenPosition(AimbotTarget);
+	if (headPos == Vector2::Zero()) return false;
+	// Wider FOV for sticky (1.5×) prevents losing target at FOV edge
+	if (Vector2::Distance(headPos, center) > Configs.Aimbot.FOV * 1.5f) return false;
 	return true;
 }
 
-void GetAimbotTarget()
-{
-	if (CameraInstance == nullptr)
-		return;
-	if (EnvironmentInstance == nullptr)
-		return;
-	if (!Configs.Aimbot.Enable)
-		return;
-	if(StickTarget())
-		return;
-	Vector2 Centerofscreen = GetCenterOfScreen();
+// Rate-limited target selection (called via CheatFunction, not every frame)
+static std::shared_ptr<CheatFunction> UpdateTarget = std::make_shared<CheatFunction>(50, [] {
+	if (!CameraInstance || !EnvironmentInstance) return;
+	if (!Configs.Aimbot.Enable) return;
+	if (StickTarget()) return;   // keep existing target — skip expensive re-sort
 
-	std::vector<std::shared_ptr<WorldEntity>> templist;
-	templist = EnvironmentInstance->GetPlayerList();
-	if (templist.empty())
-		return;
+	Vector2 center = GetCenterOfScreen();
+
+	auto templist = EnvironmentInstance->GetPlayerList();
+	if (templist.empty()) { AimbotTarget = nullptr; return; }
 
 	SortPlayers(templist);
 
-	for (std::shared_ptr<WorldEntity> player : templist)
+	for (auto& player : templist)
 	{
-		if(player == nullptr)
-			continue;
-		if (!Configs.Aimbot.TargetPlayers)
-			continue;
-		if (!player->GetValid())
-			continue;
-		if (player->GetType() == EntityType::FriendlyPlayer)
-			continue;
-		if (player->GetType() == EntityType::LocalPlayer)
-			continue;
+		if (!player) continue;
+		if (!Configs.Aimbot.TargetPlayers) continue;
+		if (!player->GetValid()) continue;
+		if (player->GetType() == EntityType::FriendlyPlayer) continue;
+		if (player->GetType() == EntityType::LocalPlayer)    continue;
 		if (Vector3::Distance(CameraInstance->GetPosition(), player->GetPosition()) > Configs.Aimbot.MaxDistance)
 			continue;
-		// Check if adjusted head position is within FOV
-		Vector2 headScreenPos = GetHeadScreenPosition(player);
-		if (headScreenPos == Vector2::Zero())
-			continue;
-		if (Vector2::Distance(headScreenPos, Centerofscreen) > Configs.Aimbot.FOV)
-			continue;
+
+		Vector2 headPos = GetHeadScreenPosition(player);
+		if (headPos == Vector2::Zero()) continue;
+		if (Vector2::Distance(headPos, center) > Configs.Aimbot.FOV) continue;
+
 		AimbotTarget = player;
 		return;
 	}
 	AimbotTarget = nullptr;
-}
+});
+
+// =============================================================================
+//  Aim key state
+// =============================================================================
 
 bool AimKeyDown = false;
 
 std::shared_ptr<CheatFunction> UpdateAimKey = std::make_shared<CheatFunction>(50, [] {
-	if (EnvironmentInstance == nullptr)
-		return;
-	if (EnvironmentInstance->GetObjectCount() < 10)
-		return;
-	if (Keyboard::IsKeyDown(Configs.Aimbot.Aimkey) || kmbox::IsDown(Configs.Aimbot.Aimkey))
-	{
-		AimKeyDown = true;
-	}
-	else
-	{
-		AimKeyDown = false;
-	}
+	if (!EnvironmentInstance) return;
+	if (EnvironmentInstance->GetObjectCount() < 10) return;
+	AimKeyDown = Keyboard::IsKeyDown(Configs.Aimbot.Aimkey) || kmbox::IsDown(Configs.Aimbot.Aimkey);
 });
+
+// =============================================================================
+//  Axis-Unlock Anti-Detection
+//  Perfect horizontal/vertical movements are inhuman — inject perpendicular noise.
+// =============================================================================
+
+static void ApplyAxisUnlock(float& x, float& y, float distToTarget)
+{
+	if (!Configs.Aimbot.AxisLockEnable) return;  // feature toggle
+
+	// Don't inject noise when locked on — it causes scope wobble
+	const float LOCK_PX = 20.0f;
+	if (distToTarget < LOCK_PX) return;
+
+	float absX    = std::abs(x);
+	float absY    = std::abs(y);
+	float maxAxis = std::max(absX, absY);
+	if (maxAxis <= 1.0f) return;  // insignificant movement — skip
+
+	float axisRatio = std::min(absX, absY) / maxAxis;
+	if (axisRatio >= Configs.Aimbot.AxisLockThreshold) return;  // not axis-locked
+
+	// Probabilistic injection
+	static std::mt19937 rng(std::random_device{}());
+	std::uniform_real_distribution<float> chanceDist(0.0f, 1.0f);
+	if (chanceDist(rng) >= Configs.Aimbot.AxisNoiseChance) return;
+
+	std::uniform_real_distribution<float> noiseDist(Configs.Aimbot.AxisNoiseMin, Configs.Aimbot.AxisNoiseMax);
+	float perpNoise = noiseDist(rng);
+	float sign      = (chanceDist(rng) > 0.5f) ? 1.0f : -1.0f;
+
+	if (absX < absY)
+		x += sign * perpNoise;  // mostly vertical   → add horizontal noise
+	else
+		y += sign * perpNoise;  // mostly horizontal → add vertical noise
+}
+
+// =============================================================================
+//  Main Aimbot loop
+// =============================================================================
 
 std::chrono::system_clock::time_point KmboxStart;
 
 void Aimbot()
-{  
+{
 	UpdateAimKey->Execute();
 	if (!kmbox::connected || !AimKeyDown)
 	{
 		AimbotTarget = nullptr;
 		return;
 	}
-	
-	GetAimbotTarget();
-	if (AimbotTarget == nullptr)
-		return;
-	
+
+	// Rate-limited target selection (50 ms)
+	UpdateTarget->Execute();
+
+	if (!AimbotTarget) return;
 	if (AimbotTarget->GetPosition() == Vector3::Zero())
 	{
 		AimbotTarget = nullptr;
 		return;
 	}
 
-	// Get predicted screen position (includes velocity tracking, latency comp, bullet travel, drop)
-	Vector2 screenpos = GetPredictedHeadScreenPosition(AimbotTarget);
+	// Get ballistic-predicted screen position (1 WorldToScreen call total)
+	Vector2 screenpos    = GetPredictedHeadScreenPosition(AimbotTarget);
+	Vector2 Centerscreen = GetCenterOfScreen();
 
-	Vector2 Centerofscreen = GetCenterOfScreen();
-	if (Vector2::Distance(screenpos, Centerofscreen) > Configs.Aimbot.FOV)
-		return;
+	if (screenpos == Vector2::Zero()) { AimbotTarget = nullptr; return; }
+	if (Vector2::Distance(screenpos, Centerscreen) > Configs.Aimbot.FOV) return;
 
-	if (screenpos == Vector2::Zero())
+	float x = screenpos.x - Centerscreen.x;
+	float y = screenpos.y - Centerscreen.y;
+
+	// ── Smoothing (S-curve zones) ─────────────────────────────────────────
+	float distToTarget  = std::sqrt(x * x + y * y);
+	float smoothing     = std::max(Configs.Aimbot.Smoothing, 1.0f);
+	const float LOCK_PX = 20.0f;
+
+	// In DMA aimbots, 1.0f smoothing causes severe oscillation (shaking) due to memory read latency.
+	// We dynamically reduce smoothing in the lock zone but enforce a minimum limit to prevent overcorrecting.
+	float minSafeSmoothing = 1.5f;
+
+	if (distToTarget < LOCK_PX)
+		smoothing = std::max(smoothing * 0.5f, minSafeSmoothing);
+	else if (distToTarget < LOCK_PX * 2.0f)
 	{
-		AimbotTarget = nullptr;
-		return;
+		float t = (distToTarget - LOCK_PX) / LOCK_PX;
+		float targetSmooth = std::max(smoothing * 0.5f, minSafeSmoothing);
+		smoothing = targetSmooth + (smoothing - targetSmooth) * t;
 	}
-	
-	float x = screenpos.x - Centerofscreen.x;
-	float y = screenpos.y - Centerofscreen.y;
-	
-	// --- 5. Target Lock & Smoothing Logic ---
-	float distanceToTarget = std::sqrt(x * x + y * y);
-	float smoothing = Configs.Aimbot.Smoothing;
+	if (smoothing < minSafeSmoothing) smoothing = minSafeSmoothing;
 
-	// LOCK MODE: If we are very close to the target, disable smoothing to stick perfectly
-	const float LOCK_THRESHOLD = 20.0f; // Pixels
-	
-	if (distanceToTarget < LOCK_THRESHOLD)
-	{
-		// Perfect Lock: Zero smoothing
-		smoothing = 1.0f; 
-	}
-	else if (distanceToTarget < LOCK_THRESHOLD * 2.0f) 
-	{
-		// Transition Zone: Linear blend from 1.0 to ConfigSmoothing
-		// Dist 20 -> 1.0
-		// Dist 40 -> ConfigSmoothing
-		float t = (distanceToTarget - LOCK_THRESHOLD) / LOCK_THRESHOLD;
-		smoothing = 1.0f + (smoothing - 1.0f) * t;
-	}
+	x /= smoothing;
+	y /= smoothing;
 
-	// Additional Safety: Ensure we never divide by < 1
-	if (smoothing < 1.0f) smoothing = 1.0f;
-	
-	x = x / smoothing;
-	y = y / smoothing;
-	
+	// ── Axis-Unlock Anti-Detection (skips when locked to prevent scope wobble) ──
+	ApplyAxisUnlock(x, y, distToTarget);
 
-	if (KmboxStart + std::chrono::milliseconds(Configs.Aimbot.UpdateRate) < std::chrono::system_clock::now()) 
+	// ── Mouse output ──────────────────────────────────────────────────────────
+	// Note: DMA updates at ~60Hz (16.6ms). Sending sub-16ms updates causes double-correction overshoot.
+	// We cap the update rate to at least 16ms to synchronize with memory updates.
+	const int lockUpdateRateMs    = std::max(16, Configs.Aimbot.UpdateRate / 2);
+	const int normalUpdateRateMs  = std::max(16, Configs.Aimbot.UpdateRate);
+	const int updateRateMs        = (distToTarget < LOCK_PX) ? lockUpdateRateMs : normalUpdateRateMs;
+
+	if (KmboxStart + std::chrono::milliseconds(updateRateMs) < std::chrono::system_clock::now())
 	{
-		// Sub-Pixel Logic
 		static float residualX = 0.0f;
 		static float residualY = 0.0f;
 
 		float targetX = x + residualX;
 		float targetY = y + residualY;
 
-		// Reduced deadzone in Lock Mode for responsiveness
+		// In lock zone: almost no deadzone so every sub-pixel is corrected
 		float baseThreshold = 0.5f + (Configs.Aimbot.Stability * 0.5f);
-		if (distanceToTarget < LOCK_THRESHOLD) baseThreshold *= 0.1f; // Almost no deadzone when locked
+		if (distToTarget < LOCK_PX) baseThreshold = 0.05f;
 
 		if (std::abs(targetX) < baseThreshold && std::abs(targetY) < baseThreshold)
 		{
@@ -334,16 +381,13 @@ void Aimbot()
 		{
 			int moveX = (int)targetX;
 			int moveY = (int)targetY;
-
 			residualX = targetX - moveX;
 			residualY = targetY - moveY;
 
 			if (moveX != 0 || moveY != 0)
-			{
 				kmbox::move(moveX, moveY);
-			}
 		}
-		
+
 		KmboxStart = std::chrono::system_clock::now();
 	}
 }

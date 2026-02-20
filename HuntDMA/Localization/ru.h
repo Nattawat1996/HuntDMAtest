@@ -81,6 +81,7 @@ namespace Localizations {
                     {"tabs.Overlay", "Оверлей"},
                     {"tabs.Aimbot", "Аимбот"},
                     {"tabs.Settings", "Настройки"},
+                    {"tabs.Hotkeys", "Горячие клавиши"},
                     {"hotkey.SelectKey", "Выбрать клавишу"},
                     {"hotkey.Instructions", "Нажмите любую клавишу или кликните для отмены"},
                     {"esp.Meters", " [{}м]"},

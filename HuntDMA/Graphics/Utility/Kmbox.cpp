@@ -9,6 +9,9 @@
 #include <map>
 #include <vector>
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
 
 namespace kmbox
 {
@@ -19,12 +22,18 @@ namespace kmbox
 	std::atomic<bool> monitor = false;
 	bool key_state[256] = { false };
 	std::thread rx_thread;
+	std::thread tx_thread;
+	std::queue<std::string> tx_queue;
+	std::mutex tx_mutex;
+	std::condition_variable tx_cv;
 
 	// Kmbox Net Globals
 	SOCKET client_socket = INVALID_SOCKET;
 	sockaddr_in server_addr;
 	bool net_connected = false;
 	std::string stored_uuid = "";
+
+	// Placeholder comment removed as per instruction.
 
 	int clamp(int i)
 	{
@@ -86,6 +95,36 @@ namespace kmbox
 			}
 		}
 		LOG_INFO("[Makcu] RxThread Stopped.");
+	}
+
+	void TxThread()
+	{
+		LOG_INFO("[KMBox] Starting TxThread...");
+		while (monitor)
+		{
+			std::string cmd;
+			{
+				std::unique_lock<std::mutex> lock(tx_mutex);
+				tx_cv.wait(lock, [] { return !tx_queue.empty() || !monitor; });
+				if (!monitor && tx_queue.empty()) break;
+				if (!tx_queue.empty()) {
+					cmd = tx_queue.front();
+					tx_queue.pop();
+				} else {
+					continue;
+				}
+			}
+
+			if (detectedDevice == DeviceType::KmboxNet) {
+				if (net_connected && client_socket != INVALID_SOCKET) {
+					sendto(client_socket, cmd.c_str(), (int)cmd.length(), 0, (sockaddr*)&server_addr, sizeof(server_addr));
+				}
+			} else if (serial_handle && serial_handle != INVALID_HANDLE_VALUE) {
+				DWORD bytesWritten;
+				WriteFile(serial_handle, cmd.c_str(), (DWORD)cmd.length(), &bytesWritten, NULL);
+			}
+		}
+		LOG_INFO("[KMBox] TxThread Stopped.");
 	}
 
 	std::string find_port(const std::string& targetDescription)
@@ -217,7 +256,7 @@ namespace kmbox
 			timeouts.ReadTotalTimeoutMultiplier = 0;
 			timeouts.ReadTotalTimeoutConstant = 1;
 			timeouts.WriteTotalTimeoutMultiplier = 0;
-			timeouts.WriteTotalTimeoutConstant = 2000;
+			timeouts.WriteTotalTimeoutConstant = 50;  // 50ms max — prevents long block on slow device
 			SetCommTimeouts(serial_handle, &timeouts);
 		}
 
@@ -258,9 +297,9 @@ namespace kmbox
 		
 		FlushFileBuffers(serial_handle);
 
-		// Start Listener Thread
+		// Start RX and TX listener threads
 		rx_thread = std::thread(RxThread);
-		rx_thread.detach();
+		tx_thread = std::thread(TxThread);
 
 		connectedPort = portName;
 		LOG_INFO("[KMBox] Successfully connected on %s", portName.c_str());
@@ -326,8 +365,18 @@ namespace kmbox
 	{
 		// Cleanup previous connection
 		monitor = false;
+		tx_cv.notify_all();
 		if (rx_thread.joinable())
 			rx_thread.join();
+		if (tx_thread.joinable())
+			tx_thread.join();
+
+		// Clear the queue
+		{
+			std::lock_guard<std::mutex> lock(tx_mutex);
+			std::queue<std::string> empty;
+			std::swap(tx_queue, empty);
+		}
 
 		connected = false;
 		net_connected = false;
@@ -429,7 +478,17 @@ namespace kmbox
 	void NetInitialize(std::string ip, std::string port, std::string uuid) {
 		// Cleanup previous
 		monitor = false;
+		tx_cv.notify_all();
 		if (rx_thread.joinable()) rx_thread.join();
+		if (tx_thread.joinable()) tx_thread.join();
+
+		// Clear the queue
+		{
+			std::lock_guard<std::mutex> lock(tx_mutex);
+			std::queue<std::string> empty;
+			std::swap(tx_queue, empty);
+		}
+
 		connected = false;
 		if (serial_handle) { CloseHandle(serial_handle); serial_handle = NULL; }
 		if (client_socket != INVALID_SOCKET) { closesocket(client_socket); WSACleanup(); client_socket = INVALID_SOCKET; }
@@ -461,31 +520,28 @@ namespace kmbox
 		detectedDevice = DeviceType::KmboxNet;
 		connectedPort = ip + ":" + port;
 
-		LOG_INFO("[KmboxNet] Initialized UDP socket to %s:%s", ip.c_str(), port.c_str());
+		monitor = true;
+		tx_thread = std::thread(TxThread);
 
-		// Optional: thread to receive? Kmbox Net usually doesn't send much back unless queried.
-		// For now, no RxThread for Net unless needed.
+		LOG_INFO("[KmboxNet] Initialized UDP socket to %s:%s", ip.c_str(), port.c_str());
 	}
 
 	void SendCommand(const char* command, size_t length)
 	{
-		if (detectedDevice == DeviceType::KmboxNet) {
-			if (!net_connected || client_socket == INVALID_SOCKET) return;
-			sendto(client_socket, command, (int)length, 0, (sockaddr*)&server_addr, sizeof(server_addr));
-			return;
-		}
-
-		DWORD bytesWritten;
-		if (!WriteFile(serial_handle, command, (DWORD)length, &bytesWritten, NULL))
+		std::string cmd(command, length);
 		{
-			//LOG_ERROR("Failed to write to serial port!");
+			std::lock_guard<std::mutex> lock(tx_mutex);
+			if (tx_queue.size() > 50) return; // Drop if overloaded
+			tx_queue.push(cmd);
 		}
+		tx_cv.notify_one();
 	}
 
 	void SendCommand(const std::string& command)
 	{
 		SendCommand(command.c_str(), command.length());
 	}
+
 
 	void move(int x, int y)
 	{

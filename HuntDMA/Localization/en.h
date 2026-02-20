@@ -81,6 +81,7 @@ namespace Localizations {
                     {"tabs.Overlay", "Overlay"},
                     {"tabs.Aimbot", "Aimbot"},
                     {"tabs.Settings", "Settings"},
+                    {"tabs.Hotkeys", "Hotkeys"},
                     {"hotkey.SelectKey", "Select Key"},
                     {"hotkey.Instructions", "Press any key or click to cancel"},
                     {"esp.Meters", " [{}m]"},

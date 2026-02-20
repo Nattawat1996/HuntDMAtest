@@ -102,7 +102,6 @@ void Environment::UpdateLocalPlayer()
 {
 	pGameClientNub = TargetProcess.Read<uint64_t>(pGame + pGameClientNubOffset);
     if (pGameClientNub == 0) {
-        LOG_WARNING("UpdateLocalPlayer: pGameClientNub is 0. Skipping pointer update.");
         return;
     }
 
@@ -307,7 +306,6 @@ void Environment::CacheEntities()
 		{
 			LocalPlayer = closestEnt->GetClass();
 			// closestEnt->SetType(EntityType::LocalPlayer); // Will be set in the main loop below
-			LOG_INFO("Found LocalPlayer (HunterBasic)! Dist: %f (Ptr: 0x%llX)", closestDist, LocalPlayer);
 		}
 	}
 

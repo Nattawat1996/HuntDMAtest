@@ -7,6 +7,7 @@
 #include "ESPRenderer.h"
 #include "Localization/Localization.h"
 #include "WeaponPresets.h"
+#include "DisplayManager.h"
 
 // Global instances
 ImGuiMenu g_ImGuiMenu;
@@ -133,14 +134,14 @@ static void SliderFloatWithInput(const char* label, float* v, float v_min, float
 {
     float width = ImGui::GetContentRegionAvail().x;
     float sliderWidth = width * 0.60f;
-    float inputWidth = width * 0.20f; 
+    float inputWidth = width * 0.20f;
 
     ImGui::PushItemWidth(sliderWidth);
     ImGui::SliderFloat(std::string("##Slider_").append(label).c_str(), v, v_min, v_max, format);
     ImGui::PopItemWidth();
 
     ImGui::SameLine();
-    
+
     // Use a unique ID for the input box based on label
     std::string inputLabel = std::string("##Input_") + label;
     ImGui::PushItemWidth(inputWidth);
@@ -351,31 +352,31 @@ void ImGuiMenu::InitializeHotkeys()
     // Register dynamic hotkeys (by pointer) so runtime changes work immediately
     Keyboard::RegisterDynamicHotkey(&Configs.Player.ToggleKey, []() {
         Configs.Player.Enable = !Configs.Player.Enable;
-    });
+        });
 
     Keyboard::RegisterDynamicHotkey(&Configs.Bosses.ToggleKey, []() {
         Configs.Bosses.Enable = !Configs.Bosses.Enable;
-    });
+        });
 
     Keyboard::RegisterDynamicHotkey(&Configs.Supply.ToggleKey, []() {
         Configs.Supply.Enable = !Configs.Supply.Enable;
-    });
+        });
 
     Keyboard::RegisterDynamicHotkey(&Configs.BloodBonds.ToggleKey, []() {
         Configs.BloodBonds.Enable = !Configs.BloodBonds.Enable;
-    });
+        });
 
     Keyboard::RegisterDynamicHotkey(&Configs.Trap.ToggleKey, []() {
         Configs.Trap.Enable = !Configs.Trap.Enable;
-    });
+        });
 
     Keyboard::RegisterDynamicHotkey(&Configs.POI.ToggleKey, []() {
         Configs.POI.Enable = !Configs.POI.Enable;
-    });
+        });
 
     Keyboard::RegisterDynamicHotkey(&Configs.Traits.ToggleKey, []() {
         Configs.Traits.Enable = !Configs.Traits.Enable;
-    });
+        });
 }
 
 void ImGuiMenu::ColorPickerWithText(const char* label, ImVec4* color) {
@@ -412,8 +413,13 @@ bool ImGuiMenu::HotKey(const char* label, int* key) {
 
     // Show current key
     char buf[128];
-    sprintf_s(buf, "%s [%s]", label, ImGuiUtils::GetKeyName(*key));
-    
+    if (label[0] == '#' && label[1] == '#') {
+        sprintf_s(buf, "[%s]##btn", ImGuiUtils::GetKeyName(*key));
+    }
+    else {
+        sprintf_s(buf, "%s [%s]", label, ImGuiUtils::GetKeyName(*key));
+    }
+
     if (ImGui::Button(buf)) {
         ImGui::OpenPopup(LOC("menu", "hotkey.SelectKey").c_str());
     }
@@ -421,32 +427,32 @@ bool ImGuiMenu::HotKey(const char* label, int* key) {
     // Modular window for choosing key
     if (ImGui::BeginPopupModal(LOC("menu", "hotkey.SelectKey").c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text(LOC("menu", "hotkey.Instructions").c_str());
-        
+
         // Check mouse input
         if (ImGui::IsMouseClicked(0)) {
-             *key = VK_LBUTTON;
-             changed = true;
-             ImGui::CloseCurrentPopup();
+            *key = VK_LBUTTON;
+            changed = true;
+            ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsMouseClicked(1)) {
-             *key = VK_RBUTTON;
-             changed = true;
-             ImGui::CloseCurrentPopup();
+            *key = VK_RBUTTON;
+            changed = true;
+            ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsMouseClicked(2)) {
-             *key = VK_MBUTTON;
-             changed = true;
-             ImGui::CloseCurrentPopup();
+            *key = VK_MBUTTON;
+            changed = true;
+            ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsMouseClicked(3)) {
-             *key = VK_XBUTTON1;
-             changed = true;
-             ImGui::CloseCurrentPopup();
+            *key = VK_XBUTTON1;
+            changed = true;
+            ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsMouseClicked(4)) {
-             *key = VK_XBUTTON2;
-             changed = true;
-             ImGui::CloseCurrentPopup();
+            *key = VK_XBUTTON2;
+            changed = true;
+            ImGui::CloseCurrentPopup();
         }
 
         // Check key input
@@ -599,6 +605,10 @@ void ImGuiMenu::RenderMenu() {
             RenderSettingsTab();
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem(LOC("menu", "tabs.Hotkeys").c_str())) {
+            RenderHotkeysTab();
+            ImGui::EndTabItem();
+        }
         ImGui::EndTabBar();
     }
 
@@ -621,9 +631,6 @@ void ImGuiMenu::RenderPlayerESPTab() {
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Player.Enable);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Player.TextColor);
-
-    ImGui::SameLine();
-    HotKey("Toggle Key", &Configs.Player.ToggleKey);
 
     ImGui::SliderInt(LOC("menu", "general.MaxDistance").c_str(), &Configs.Player.MaxDistance, 0, 1500, LOC("menu", "general.Meters").c_str());
 
@@ -705,9 +712,6 @@ void ImGuiMenu::RenderBossesESPTab() {
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Bosses.TextColor);
 
-    ImGui::SameLine();
-    HotKey("Toggle Key", &Configs.Bosses.ToggleKey);
-
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.Bosses.Name);
     ImGui::SameLine();
     ImGui::Checkbox(LOC("menu", "general.Distance").c_str(), &Configs.Bosses.Distance);
@@ -724,9 +728,6 @@ void ImGuiMenu::RenderSupplyESPTab() {
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Supply.Enable);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Supply.TextColor);
-
-    ImGui::SameLine();
-    HotKey("Toggle Key", &Configs.Supply.ToggleKey);
 
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.Supply.Name);
     ImGui::SameLine();
@@ -768,9 +769,6 @@ void ImGuiMenu::RenderBloodBondsESPTab() {
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.BloodBonds.TextColor);
 
-    ImGui::SameLine();
-    HotKey("Toggle Key", &Configs.BloodBonds.ToggleKey);
-
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.BloodBonds.Name);
     ImGui::SameLine();
     ImGui::Checkbox(LOC("menu", "general.Distance").c_str(), &Configs.BloodBonds.Distance);
@@ -783,10 +781,6 @@ void ImGuiMenu::RenderBloodBondsESPTab() {
 
 void ImGuiMenu::RenderTrapESPTab() {
     ImGui::BeginChild("TrapESPTab", ImVec2(0, 0), false);
-
-    ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Trap.Enable);
-    ImGui::SameLine();
-    HotKey("Toggle Key", &Configs.Trap.ToggleKey);
 
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "traps.TrapColor").c_str(), &Configs.Trap.TrapColor);
@@ -826,9 +820,6 @@ void ImGuiMenu::RenderPOIESPTab() {
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.POI.Enable);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.POI.TextColor);
-
-    ImGui::SameLine();
-    HotKey("Toggle Key", &Configs.POI.ToggleKey);
 
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.POI.Name);
     ImGui::SameLine();
@@ -873,10 +864,7 @@ void ImGuiMenu::RenderTraitESPTab() {
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Traits.Enable);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Traits.TraitColor);
-    
-    ImGui::SameLine();
-    HotKey("Toggle Key", &Configs.Traits.ToggleKey);
-    
+
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.Traits.Name);
     ImGui::SameLine();
     ImGui::Checkbox(LOC("menu", "general.Distance").c_str(), &Configs.Traits.Distance);
@@ -1090,18 +1078,106 @@ void ImGuiMenu::RenderTraitESPTab() {
     ImGui::EndChild();
 }
 
+void ImGuiMenu::RenderHotkeysTab() {
+    ImGui::BeginChild("HotkeysTab", ImVec2(0, 0), false);
+
+    ImGui::Text(LOC("menu", "tabs.PlayerESP").c_str());
+    ImGui::SameLine(180 * Configs.General.UIScale);
+    HotKey("##PlayerToggle", &Configs.Player.ToggleKey);
+
+    ImGui::Text(LOC("menu", "tabs.BossesESP").c_str());
+    ImGui::SameLine(180 * Configs.General.UIScale);
+    HotKey("##BossesToggle", &Configs.Bosses.ToggleKey);
+
+    ImGui::Text(LOC("menu", "tabs.SupplyESP").c_str());
+    ImGui::SameLine(180 * Configs.General.UIScale);
+    HotKey("##SupplyToggle", &Configs.Supply.ToggleKey);
+
+    ImGui::Text(LOC("menu", "tabs.BBESP").c_str());
+    ImGui::SameLine(180 * Configs.General.UIScale);
+    HotKey("##BBToggle", &Configs.BloodBonds.ToggleKey);
+
+    ImGui::Text(LOC("menu", "tabs.TrapESP").c_str());
+    ImGui::SameLine(180 * Configs.General.UIScale);
+    HotKey("##TrapToggle", &Configs.Trap.ToggleKey);
+
+    ImGui::Text(LOC("menu", "tabs.POIESP").c_str());
+    ImGui::SameLine(180 * Configs.General.UIScale);
+    HotKey("##POIToggle", &Configs.POI.ToggleKey);
+
+    ImGui::Text(LOC("menu", "tabs.TraitESP").c_str());
+    ImGui::SameLine(180 * Configs.General.UIScale);
+    HotKey("##TraitToggle", &Configs.Traits.ToggleKey);
+
+    ImGui::EndChild();
+}
+
 void ImGuiMenu::RenderOverlayTab() {
     ImGui::BeginChild("OverlayTab", ImVec2(0, 0), false);
 
     ImGui::BeginGroup();
-    ImGui::Text(LOC("menu", "overlay.ResolutionSettings").c_str());
-    ImGui::Checkbox(LOC("menu", "overlay.OverrideResolution").c_str(), &Configs.General.OverrideResolution);
+    ImGui::Text("Display Settings");
 
-    if (Configs.General.OverrideResolution)
-    {
-        ImGui::InputInt(LOC("menu", "overlay.ScreenWidth").c_str(), &Configs.General.Width);
-        ImGui::InputInt(LOC("menu", "overlay.ScreenHeight").c_str(), &Configs.General.Height);
+    int prevMonitor = DisplayManager::GetCurrentMonitorIndex();
+    int currentMonitor = prevMonitor;
+    std::string monitorHeader = "Select Monitor";
+    if (currentMonitor >= 0 && currentMonitor < DisplayManager::GetMonitorCount()) {
+        monitorHeader = DisplayManager::GetMonitor(currentMonitor).name;
     }
+
+    if (ImGui::BeginCombo("Monitor", monitorHeader.c_str())) {
+        for (int i = 0; i < DisplayManager::GetMonitorCount(); i++) {
+            bool is_selected = (currentMonitor == i);
+            if (ImGui::Selectable(DisplayManager::GetMonitor(i).name, is_selected)) {
+                currentMonitor = i;
+            }
+            if (is_selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    if (currentMonitor != prevMonitor) {
+        DisplayManager::SetCurrentMonitor(currentMonitor);
+    }
+
+    int prevPreset = DisplayManager::GetCurrentResolutionPreset();
+    int currentPreset = prevPreset;
+
+    if (ImGui::BeginCombo("Resolution Preset", DisplayManager::GetResolutionPresetName(currentPreset))) {
+        for (int i = 0; i < DisplayManager::GetResolutionPresetCount(); i++) {
+            bool is_selected = (currentPreset == i);
+            if (ImGui::Selectable(DisplayManager::GetResolutionPresetName(i), is_selected)) {
+                currentPreset = i;
+            }
+            if (is_selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    if (currentPreset != prevPreset) {
+        DisplayManager::ApplyResolutionPreset(currentPreset);
+        HWND hWnd = (HWND)ImGui::GetMainViewport()->PlatformHandle;
+        if (hWnd) {
+            SetWindowPos(hWnd, nullptr, 0, 0, (int)DisplayManager::ScreenWidth, (int)DisplayManager::ScreenHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+        }
+    }
+
+    if (currentPreset == 4)
+    {
+        float pWidth = DisplayManager::ScreenWidth;
+        float pHeight = DisplayManager::ScreenHeight;
+
+        ImGui::InputFloat("Custom Width", &DisplayManager::ScreenWidth);
+        ImGui::InputFloat("Custom Height", &DisplayManager::ScreenHeight);
+
+        if (pWidth != DisplayManager::ScreenWidth || pHeight != DisplayManager::ScreenHeight) {
+            HWND hWnd = (HWND)ImGui::GetMainViewport()->PlatformHandle;
+            if (hWnd) {
+                SetWindowPos(hWnd, nullptr, 0, 0, (int)DisplayManager::ScreenWidth, (int)DisplayManager::ScreenHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            }
+        }
+    }
+
     ImGui::EndGroup();
 
     ImGui::Separator();
@@ -1115,7 +1191,7 @@ void ImGuiMenu::RenderOverlayTab() {
     ColorPickerWithText(LOC("menu", "overlay.PlayerColor").c_str(), &Configs.Overlay.PlayerRadarColor);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "overlay.EnemyColor").c_str(), &Configs.Overlay.EnemyRadarColor);
-    
+
     // Manual Adjustments
     SliderFloatWithInput(LOC("menu", "overlay.RadarScale").c_str(), &Configs.Overlay.RadarScale, 0.1f, 2.0f, "%.5f");
     SliderFloatWithInput(LOC("menu", "overlay.RadarX").c_str(), &Configs.Overlay.RadarX, -0.05f, 0.05f, "%.5f");
@@ -1254,12 +1330,13 @@ void ImGuiMenu::RenderAimbotTab() {
             }
         }
         ImGui::SameLine();
-        
+
         // Build port list for combo (first item is "Auto")
         std::string currentPortLabel = "Auto (scan all)";
         if (selectedPortIdx > 0 && selectedPortIdx <= (int)availablePorts.size()) {
             currentPortLabel = availablePorts[selectedPortIdx - 1].portName + " - " + availablePorts[selectedPortIdx - 1].description;
-        } else if (!Configs.Aimbot.KmboxPort.empty()) {
+        }
+        else if (!Configs.Aimbot.KmboxPort.empty()) {
             currentPortLabel = Configs.Aimbot.KmboxPort + " (saved)";
         }
 
@@ -1301,19 +1378,20 @@ void ImGuiMenu::RenderAimbotTab() {
 
     if (ImGui::Button("Connect")) {
         if (Configs.Aimbot.KmboxDeviceType == 3) {
-             kmbox::NetInitialize(Configs.Aimbot.KmboxIP, Configs.Aimbot.KmboxNetPort, Configs.Aimbot.KmboxUUID);
-        } else {
-             kmbox::KmboxInitialize(Configs.Aimbot.KmboxPort, Configs.Aimbot.KmboxBaudRate, (kmbox::DeviceType)Configs.Aimbot.KmboxDeviceType);
+            kmbox::NetInitialize(Configs.Aimbot.KmboxIP, Configs.Aimbot.KmboxNetPort, Configs.Aimbot.KmboxUUID);
+        }
+        else {
+            kmbox::KmboxInitialize(Configs.Aimbot.KmboxPort, Configs.Aimbot.KmboxBaudRate, (kmbox::DeviceType)Configs.Aimbot.KmboxDeviceType);
         }
     }
     ImGui::SameLine();
     if (kmbox::connected) {
         const char* detectedName = "Unknown";
         switch (kmbox::detectedDevice) {
-            case kmbox::DeviceType::Makcu: detectedName = "Makcu (4MHz)"; break;
-            case kmbox::DeviceType::StandardKmbox: detectedName = "Standard KMBox"; break;
-            case kmbox::DeviceType::KmboxNet: detectedName = "Kmbox Net"; break;
-            default: detectedName = "Connected"; break;
+        case kmbox::DeviceType::Makcu: detectedName = "Makcu (4MHz)"; break;
+        case kmbox::DeviceType::StandardKmbox: detectedName = "Standard KMBox"; break;
+        case kmbox::DeviceType::KmboxNet: detectedName = "Kmbox Net"; break;
+        default: detectedName = "Connected"; break;
         }
         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s on %s", detectedName, kmbox::connectedPort.c_str());
     }
@@ -1404,16 +1482,14 @@ void ImGuiMenu::RenderAimbotTab() {
                 if (i == 0)
                     snprintf(itemLabel, sizeof(itemLabel), "%s", WeaponPresets[i].name);
                 else
-                    snprintf(itemLabel, sizeof(itemLabel), "%s (%.0fm/s, DR%.0f)", 
+                    snprintf(itemLabel, sizeof(itemLabel), "%s (%.0fm/s, DR%.0f)",
                         WeaponPresets[i].name, WeaponPresets[i].bulletSpeed, WeaponPresets[i].dropRange);
-                
+
                 if (ImGui::Selectable(itemLabel, isSelected)) {
                     Configs.Aimbot.WeaponPreset = i;
                     if (i > 0) {
-                        // Apply preset values
+                        // Only BulletSpeed is stored; drag/dropMult are resolved at runtime from WeaponDatabase
                         Configs.Aimbot.BulletSpeed = WeaponPresets[i].bulletSpeed;
-                        Configs.Aimbot.DropRange = WeaponPresets[i].dropRange;
-                        Configs.Aimbot.AmmoType = WeaponPresets[i].ammoType;
                     }
                 }
                 if (isSelected) ImGui::SetItemDefaultFocus();
@@ -1426,127 +1502,78 @@ void ImGuiMenu::RenderAimbotTab() {
             "Changing any ballistic slider will revert to 'Custom'."
         );
 
-        // Show current preset info
+        // Show current preset info (speed + drop multiplier lookup happens at runtime)
         if (Configs.Aimbot.WeaponPreset > 0 && Configs.Aimbot.WeaponPreset < WeaponPresetCount) {
-            const char* ammoNames[] = { "Compact", "Medium", "Long" };
-            int at = WeaponPresets[Configs.Aimbot.WeaponPreset].ammoType;
-            ImGui::TextDisabled("  %s | %.0f m/s | DR %.0f m", 
-                (at >= 0 && at <= 2) ? ammoNames[at] : "?",
-                Configs.Aimbot.BulletSpeed, Configs.Aimbot.DropRange);
+            ImGui::TextDisabled("  %.0f m/s | DR %d m",
+                WeaponPresets[Configs.Aimbot.WeaponPreset].bulletSpeed,
+                (int)WeaponPresets[Configs.Aimbot.WeaponPreset].dropRange);
         }
 
-        // Track previous values to detect manual changes
         float prevBulletSpeed = Configs.Aimbot.BulletSpeed;
-        float prevDropRange = Configs.Aimbot.DropRange;
-        int prevAmmoType = Configs.Aimbot.AmmoType;
 
         ImGui::Separator();
 
-        SliderFloatWithInput("Bullet Speed", &Configs.Aimbot.BulletSpeed, 100.0f, 900.0f, "%.0f m/s");
-        ImGui::SameLine(); HelpMarker(
-            "Muzzle velocity of the weapon in meters per second.\n"
-            "Auto-filled by weapon preset, or set manually."
-        );
-
-        SliderFloatWithInput("Aim Smoothing", &Configs.Aimbot.Smoothing, 1.0f, 20.0f, "%.1f");
-        ImGui::SameLine(); HelpMarker(
-            "How smoothly the aim moves to the target.\n"
-            "1.0 = Instant snap (least natural)\n"
-            "5.0 = Smooth (recommended)\n"
-            "20.0 = Very slow movement"
-        );
-
-        SliderIntWithInput("Update Delay", &Configs.Aimbot.UpdateRate, 1, 50, "%d ms");
-        ImGui::SameLine(); HelpMarker(
-            "Delay between aim updates in milliseconds.\n"
-            "Lower = Faster/Smoother updates (Higher CPU/Network usage)\n"
-            "Higher = Slower/Choppier updates\n"
-            "Default: 10ms (100Hz)\n"
-            "Recommended for smoothness: 1-5ms"
-        );
-
-        SliderFloatWithInput("Lock Stability", &Configs.Aimbot.Stability, 0.0f, 1.0f, "%.2f");
-        ImGui::SameLine(); HelpMarker(
-            "Reduces shaking/jitter by ignoring tiny sub-pixel movements.\n"
-            "0.0 = No stabilization (maximum responsiveness)\n"
-            "0.5 = Balanced dampening\n"
-            "1.0 = Strong dampening (may feel 'sticky')\n"
-            "Increase if aim shakes at long range."
-        );
+        // Custom bullet speed (only meaningful when WeaponPreset == 0)
+        if (Configs.Aimbot.WeaponPreset == 0) {
+            SliderFloatWithInput("Bullet Speed", &Configs.Aimbot.BulletSpeed, 100.0f, 900.0f, "%.0f m/s");
+            ImGui::SameLine(); HelpMarker("Muzzle velocity (m/s) — auto-filled by weapon preset.");
+        }
 
         SliderFloatWithInput("Prediction Scale", &Configs.Aimbot.PredictionScale, 0.0f, 2.0f, "%.2f");
         ImGui::SameLine(); HelpMarker(
-            "Fine-tune the prediction amount.\n"
-            "1.0 = Physics-accurate prediction\n"
-            "< 1.0 = Under-lead (for close range)\n"
-            "> 1.0 = Over-lead (for latency compensation)"
+            "Fine-tune lead amount.\n"
+            "1.0 = Physics-accurate | <1.0 = under-lead | >1.0 = over-lead"
         );
-
-        SliderFloatWithInput("Drop Range", &Configs.Aimbot.DropRange, 10.0f, 500.0f, "%.0f m");
-        ImGui::SameLine(); HelpMarker(
-            "Distance before bullet drop becomes significant.\n"
-            "Auto-filled by weapon preset, or set manually."
-        );
-
-        ImGui::Checkbox("Auto Drop Power", &Configs.Aimbot.AutoDropPower);
-        ImGui::SameLine(); HelpMarker(
-            "Automatically calculates Drop Power from Drop Range.\n"
-            "Calibrated from user testing data.\n"
-            "Uncheck to manually tune Drop Power."
-        );
-
-        if (Configs.Aimbot.AutoDropPower)
-        {
-            // Ammo Type selector (only visible when Auto is on)
-            const char* ammoTypes[] = { "Compact/Small", "Medium", "Long" };
-            ImGui::Combo("Ammo Type", &Configs.Aimbot.AmmoType, ammoTypes, IM_ARRAYSIZE(ammoTypes));
-            ImGui::SameLine(); HelpMarker(
-                "Small/Medium: Standard drop curve\n"
-                "Long: Flatter trajectory (+0.2 power)\n"
-                "Auto-filled by weapon preset."
-            );
-
-            // Show computed power
-            float autoPower;
-            if (Configs.Aimbot.DropRange < 90.0f)
-                autoPower = 2.0f + (Configs.Aimbot.DropRange - 90.0f) * 0.027f;
-            else
-                autoPower = 2.0f + (Configs.Aimbot.DropRange - 90.0f) * 0.006f;
-            if (autoPower < 1.0f) autoPower = 1.0f;
-            if (Configs.Aimbot.AmmoType == 2) autoPower += 0.2f;
-            ImGui::TextDisabled("Computed Power: %.2f", autoPower);
-        }
-        else
-        {
-            SliderFloatWithInput("Drop Power", &Configs.Aimbot.DropPower, 1.0f, 4.0f, "%.2f");
-            ImGui::SameLine(); HelpMarker(
-                "Exponent for the drop curve.\n"
-                "Higher = Steeper drop at range\n"
-                "Lower = Flatter trajectory"
-            );
-        }
 
         SliderFloatWithInput("Gravity Scale", &Configs.Aimbot.GravityScale, 0.1f, 3.0f, "%.2f");
         ImGui::SameLine(); HelpMarker(
-            "Multiplier on real gravity (9.81 m/s²).\n"
-            "1.0 = Standard physics gravity\n"
-            "< 1.0 = Less drop (bullets fly flatter)\n"
-            "> 1.0 = More drop\n"
-            "IMPORTANT: Reset to 1.0 after weapon formula update!"
+            "Multiplier on 9.81 m/s². 1.0 = real gravity.\n"
+            "Drag and dropMult are resolved automatically from the weapon preset."
         );
 
-        // Auto-revert to Custom if user manually changed any ballistic slider
-        if (Configs.Aimbot.WeaponPreset > 0) {
-            if (Configs.Aimbot.BulletSpeed != prevBulletSpeed ||
-                Configs.Aimbot.DropRange != prevDropRange ||
-                Configs.Aimbot.AmmoType != prevAmmoType) {
-                Configs.Aimbot.WeaponPreset = 0; // Revert to Custom
-            }
-        }
+        // Auto-revert WeaponPreset to Custom if user manually changed BulletSpeed
+        if (Configs.Aimbot.WeaponPreset > 0 && Configs.Aimbot.BulletSpeed != prevBulletSpeed)
+            Configs.Aimbot.WeaponPreset = 0;
+    }
+    ImGui::EndGroup();  // end Prediction group (opened at top of section)
+
+    ImGui::Separator();
+
+    // ── Axis-Unlock Anti-Detection ──────────────────────────────────────
+
+    ImGui::BeginGroup();
+    ImGui::Text("Axis-Unlock Anti-Detection");
+    ImGui::Checkbox("Enable Axis-Unlock", &Configs.Aimbot.AxisLockEnable);
+    ImGui::SameLine(); HelpMarker(
+        "Injects perpendicular noise when movement is perfectly horizontal or vertical.\n"
+        "Makes aim look less robotic to anti-cheat systems."
+    );
+    if (Configs.Aimbot.AxisLockEnable) {
+        SliderFloatWithInput("Lock Threshold", &Configs.Aimbot.AxisLockThreshold, 0.01f, 0.5f, "%.2f");
+        ImGui::SameLine(); HelpMarker("Ratio below which movement is considered axis-locked (lower = more sensitive)");
+        SliderFloatWithInput("Noise Chance", &Configs.Aimbot.AxisNoiseChance, 0.0f, 1.0f, "%.2f");
+        ImGui::SameLine(); HelpMarker("Probability of injecting noise when axis-lock is detected");
+        SliderFloatWithInput("Noise Min", &Configs.Aimbot.AxisNoiseMin, 0.1f, 2.0f, "%.2f");
+        SliderFloatWithInput("Noise Max", &Configs.Aimbot.AxisNoiseMax, 0.1f, 5.0f, "%.2f");
+        ImGui::SameLine(); HelpMarker("Perpendicular noise magnitude range (pixels)");
     }
     ImGui::EndGroup();
 
     ImGui::Separator();
+
+    // ── Output settings ─────────────────────────────────────────────────
+    ImGui::BeginGroup();
+    ImGui::Text("Output Settings");
+    SliderFloatWithInput("Aim Smoothing", &Configs.Aimbot.Smoothing, 1.0f, 20.0f, "%.1f");
+    ImGui::SameLine(); HelpMarker("1.0=instant snap | 5.0=smooth | 20.0=very slow");
+    SliderIntWithInput("Update Delay", &Configs.Aimbot.UpdateRate, 1, 50, "%d ms");
+    ImGui::SameLine(); HelpMarker("ms between kmbox::move() calls — lower = smoother");
+    SliderFloatWithInput("Lock Stability", &Configs.Aimbot.Stability, 0.0f, 1.0f, "%.2f");
+    ImGui::SameLine(); HelpMarker("Sub-pixel deadzone dampening (0=off, 1=strong)");
+    ImGui::EndGroup();
+
+    ImGui::Separator();
+
 
     // Key binding
     ImGui::BeginGroup();
@@ -1689,7 +1716,7 @@ void ImGuiMenu::RenderSettingsTab() {
             ImGui::Text(LOC("menu", "settings.WriteEntitiesDumpInfo").c_str());
             ImGui::EndTooltip();
         }
-    }    
+    }
 
     ImGui::Separator();
 

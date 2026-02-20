@@ -26,15 +26,16 @@
 #include "Localization/Localization.h"
 #include <windows.h>
 #include "resource.h"
+#include "Graphics/DisplayManager.h"
 
 void InitializeGame()
 {
-	while (!TargetProcess.Init("HuntGame.exe", true, true))
-	{
+    while (!TargetProcess.Init("HuntGame.exe", true, true))
+    {
         LOG_WARNING("Failed to attach to game process. Retrying in 2 seconds...");
-		Sleep(2000);
-	}
-	TargetProcess.FixCr3();
+        Sleep(2000);
+    }
+    TargetProcess.FixCr3();
     LOG_INFO("HuntGame base address: 0x%X", TargetProcess.GetBaseAddress("HuntGame.exe"));
     LOG_INFO("GameHunt base address: 0x%X", TargetProcess.GetBaseAddress("GameHunt.dll"));
 }
@@ -46,37 +47,37 @@ bool isMouseTracking = false; // To re-enable tracking for mouse window leaving 
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	// First pass events to ImGui
-	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
-		return true;
+    // First pass events to ImGui
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+        return true;
 
-	// Then handle standard messages
-	InputWndProc(hWnd, message, wParam, lParam);
+    // Then handle standard messages
+    InputWndProc(hWnd, message, wParam, lParam);
 
-	// Additionally handle window messages
-	switch (message)
-	{
-		case WM_DESTROY:
-            LOG_WARNING("Window destroying, application shutting down");
-            DeleteObject((HBRUSH)GetClassLongPtr(hWnd, GCLP_HBRBACKGROUND));
-			PostQuitMessage(0);
-			return 0;
-		case WM_MOUSEMOVE:
-			if (!isMouseTracking) {
-				TRACKMOUSEEVENT tme;
-				tme.cbSize = sizeof(TRACKMOUSEEVENT);
-				tme.dwFlags = TME_LEAVE;
-				tme.hwndTrack = hWnd;
-				TrackMouseEvent(&tme);
-				isMouseTracking = true;
-			}
-			break;
-		case WM_MOUSELEAVE:
-			isMouseTracking = false;
-			break;
-	}
+    // Additionally handle window messages
+    switch (message)
+    {
+    case WM_DESTROY:
+        LOG_WARNING("Window destroying, application shutting down");
+        DeleteObject((HBRUSH)GetClassLongPtr(hWnd, GCLP_HBRBACKGROUND));
+        PostQuitMessage(0);
+        return 0;
+    case WM_MOUSEMOVE:
+        if (!isMouseTracking) {
+            TRACKMOUSEEVENT tme;
+            tme.cbSize = sizeof(TRACKMOUSEEVENT);
+            tme.dwFlags = TME_LEAVE;
+            tme.hwndTrack = hWnd;
+            TrackMouseEvent(&tme);
+            isMouseTracking = true;
+        }
+        break;
+    case WM_MOUSELEAVE:
+        isMouseTracking = false;
+        break;
+    }
 
-	return DefWindowProc(hWnd, message, wParam, lParam);
+    return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -130,10 +131,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DWORD exStyle;
         if (Configs.General.OverlayMode)
             exStyle = WS_EX_TOPMOST |
-                      WS_EX_LAYERED |
-                      WS_EX_TRANSPARENT |
-                      WS_EX_NOACTIVATE |
-                      WS_EX_TOOLWINDOW;
+            WS_EX_LAYERED |
+            WS_EX_TRANSPARENT |
+            WS_EX_NOACTIVATE |
+            WS_EX_TOOLWINDOW;
         else
             exStyle = WS_EX_APPWINDOW;
 
@@ -142,8 +143,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             wc.lpszClassName,
             L"Hunt DMA",
             WS_POPUP,
-            0, 0,
-            GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
+            DisplayManager::GetMonitorX(), DisplayManager::GetMonitorY(),
+            (int)DisplayManager::ScreenWidth, (int)DisplayManager::ScreenHeight,
             NULL, NULL,
             hInstance,
             NULL
@@ -166,6 +167,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (!SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA)) {
             LOG_WARNING("Failed to set window transparency");
         }
+
+        DisplayManager::Initialize();
 
         BOOL enable = TRUE;
         DwmSetWindowAttribute(hWnd, DWMWA_NCRENDERING_POLICY,
@@ -205,7 +208,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             try {
                 if (Configs.General.OverlayMode)
                 {
-                    SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    SetWindowPos(hWnd, HWND_TOPMOST, DisplayManager::GetMonitorX(), DisplayManager::GetMonitorY(), (int)DisplayManager::ScreenWidth, (int)DisplayManager::ScreenHeight, SWP_NOACTIVATE);
 
                     MARGINS margins = { -1, -1, -1, -1 };
                     DwmExtendFrameIntoClientArea(hWnd, &margins);
@@ -255,7 +258,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 DrawOtherEsp();
                 DrawBossesEsp();
                 DrawPlayersEsp();
-                DrawRadar();
                 DrawOverlay();
 
                 // Enable/Disable cousor
@@ -266,14 +268,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         if (exStyle & WS_EX_TRANSPARENT) {
                             exStyle &= ~WS_EX_TRANSPARENT;
                             SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle);
-                            SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+                            SetWindowPos(hWnd, nullptr, 0, 0, (int)DisplayManager::ScreenWidth, (int)DisplayManager::ScreenHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
                         }
                     }
                     else {
                         if (!(exStyle & WS_EX_TRANSPARENT)) {
                             exStyle |= WS_EX_TRANSPARENT;
                             SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle);
-                            SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+                            SetWindowPos(hWnd, nullptr, 0, 0, (int)DisplayManager::ScreenWidth, (int)DisplayManager::ScreenHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
                         }
                     }
                 }
@@ -296,7 +298,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         Logger::WriteMiniDump("crash_" + std::to_string(std::time(nullptr)) + ".dmp", nullptr);
         return -1;
     }
-    
+
     LOG_INFO("Application shutting down, cleaning up...");
     g_ImGuiMenu.Shutdown();
 

@@ -36,6 +36,7 @@ private:
     void RenderOverlayTab();
     void RenderAimbotTab();
     void RenderSettingsTab();
+    void RenderHotkeysTab();
 
     bool RenderFontSizeSlider(const char* label, int& configValue);
 

@@ -113,6 +113,7 @@
     <ClCompile Include="Esp\Overlay.cpp" />
     <ClCompile Include="Esp\PlayerEsp.cpp" />
     <ClCompile Include="Esp\SpectatorAlarm.cpp" />
+    <ClCompile Include="Graphics\DisplayManager.cpp" />
     <ClCompile Include="Graphics\ESPRenderer.cpp" />
     <ClCompile Include="Graphics\ImGuiMenu.cpp" />
     <ClCompile Include="Graphics\Start Up\Init.cpp" />
@@ -171,6 +172,7 @@
     <ClInclude Include="Esp\PlayerEsp.h" />
     <ClInclude Include="Esp\SpectatorAlarm.h" />
     <ClInclude Include="Globals.h" />
+    <ClInclude Include="Graphics\DisplayManager.h" />
     <ClInclude Include="Graphics\ESPRenderer.h" />
     <ClInclude Include="Graphics\Start Up\Init.h" />
     <ClInclude Include="Graphics\ImGuiMenu.h" />
