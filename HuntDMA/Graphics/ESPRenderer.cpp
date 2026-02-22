@@ -2,6 +2,7 @@
 #include "ESPRenderer.h"
 #include "XorStr.h"
 #include "Fonts.h"
+#include "DisplayManager.h"
 
 // Static member initialization
 ImDrawList* ESPRenderer::s_drawList = nullptr;
@@ -84,8 +85,8 @@ void ESPRenderer::BeginFrame()
         s_screenHeight = static_cast<float>(Configs.General.Height);
     }
     else {
-        s_screenWidth = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
-        s_screenHeight = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
+        s_screenWidth = DisplayManager::ScreenWidth;
+        s_screenHeight = DisplayManager::ScreenHeight;
     }
 
     s_screenCenter = ImVec2(s_screenWidth * 0.5f, s_screenHeight * 0.5f);
@@ -106,35 +107,35 @@ void ESPRenderer::DrawText(const ImVec2& pos, const std::string& text, const ImV
         ImVec2 textSize = font->CalcTextSizeA(static_cast<float>(fontSize), FLT_MAX, 0.0f, text.c_str());
         switch (alignment)
         {
-            case TopLeft:
-                newPos = ImVec2(pos.x, pos.y);
-                break;
-            case TopCenter:
-                newPos = ImVec2(pos.x - textSize.x * 0.5f, pos.y);
-                break;
-            case TopRight:
-                newPos = ImVec2(pos.x - textSize.x, pos.y);
-                break;
-            case MiddleLeft:
-                newPos = ImVec2(pos.x, pos.y - textSize.y * 0.5f);
-                break;
-            case Center:
-                newPos = ImVec2(pos.x - textSize.x * 0.5f, pos.y - textSize.y * 0.5f);
-                break;
-            case MiddleRight:
-                newPos = ImVec2(pos.x - textSize.x, pos.y - textSize.y * 0.5f);
-                break;
-            case BottomLeft:
-                newPos = ImVec2(pos.x, pos.y - textSize.y);
-                break;
-            case BottomCenter:
-                newPos = ImVec2(pos.x - textSize.x * 0.5f, pos.y - textSize.y);
-                break;
-            case BottomRight:
-                newPos = ImVec2(pos.x - textSize.x, pos.y - textSize.y);
-                break;
-            default:
-                break;
+        case TopLeft:
+            newPos = ImVec2(pos.x, pos.y);
+            break;
+        case TopCenter:
+            newPos = ImVec2(pos.x - textSize.x * 0.5f, pos.y);
+            break;
+        case TopRight:
+            newPos = ImVec2(pos.x - textSize.x, pos.y);
+            break;
+        case MiddleLeft:
+            newPos = ImVec2(pos.x, pos.y - textSize.y * 0.5f);
+            break;
+        case Center:
+            newPos = ImVec2(pos.x - textSize.x * 0.5f, pos.y - textSize.y * 0.5f);
+            break;
+        case MiddleRight:
+            newPos = ImVec2(pos.x - textSize.x, pos.y - textSize.y * 0.5f);
+            break;
+        case BottomLeft:
+            newPos = ImVec2(pos.x, pos.y - textSize.y);
+            break;
+        case BottomCenter:
+            newPos = ImVec2(pos.x - textSize.x * 0.5f, pos.y - textSize.y);
+            break;
+        case BottomRight:
+            newPos = ImVec2(pos.x - textSize.x, pos.y - textSize.y);
+            break;
+        default:
+            break;
         }
     }
 
