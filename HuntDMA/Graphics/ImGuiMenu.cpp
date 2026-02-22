@@ -134,14 +134,14 @@ static void SliderFloatWithInput(const char* label, float* v, float v_min, float
 {
     float width = ImGui::GetContentRegionAvail().x;
     float sliderWidth = width * 0.60f;
-    float inputWidth = width * 0.20f;
+    float inputWidth = width * 0.20f; 
 
     ImGui::PushItemWidth(sliderWidth);
     ImGui::SliderFloat(std::string("##Slider_").append(label).c_str(), v, v_min, v_max, format);
     ImGui::PopItemWidth();
 
     ImGui::SameLine();
-
+    
     // Use a unique ID for the input box based on label
     std::string inputLabel = std::string("##Input_") + label;
     ImGui::PushItemWidth(inputWidth);
@@ -352,31 +352,31 @@ void ImGuiMenu::InitializeHotkeys()
     // Register dynamic hotkeys (by pointer) so runtime changes work immediately
     Keyboard::RegisterDynamicHotkey(&Configs.Player.ToggleKey, []() {
         Configs.Player.Enable = !Configs.Player.Enable;
-        });
+    });
 
     Keyboard::RegisterDynamicHotkey(&Configs.Bosses.ToggleKey, []() {
         Configs.Bosses.Enable = !Configs.Bosses.Enable;
-        });
+    });
 
     Keyboard::RegisterDynamicHotkey(&Configs.Supply.ToggleKey, []() {
         Configs.Supply.Enable = !Configs.Supply.Enable;
-        });
+    });
 
     Keyboard::RegisterDynamicHotkey(&Configs.BloodBonds.ToggleKey, []() {
         Configs.BloodBonds.Enable = !Configs.BloodBonds.Enable;
-        });
+    });
 
     Keyboard::RegisterDynamicHotkey(&Configs.Trap.ToggleKey, []() {
         Configs.Trap.Enable = !Configs.Trap.Enable;
-        });
+    });
 
     Keyboard::RegisterDynamicHotkey(&Configs.POI.ToggleKey, []() {
         Configs.POI.Enable = !Configs.POI.Enable;
-        });
+    });
 
     Keyboard::RegisterDynamicHotkey(&Configs.Traits.ToggleKey, []() {
         Configs.Traits.Enable = !Configs.Traits.Enable;
-        });
+    });
 }
 
 void ImGuiMenu::ColorPickerWithText(const char* label, ImVec4* color) {
@@ -415,11 +415,10 @@ bool ImGuiMenu::HotKey(const char* label, int* key) {
     char buf[128];
     if (label[0] == '#' && label[1] == '#') {
         sprintf_s(buf, "[%s]##btn", ImGuiUtils::GetKeyName(*key));
-    }
-    else {
+    } else {
         sprintf_s(buf, "%s [%s]", label, ImGuiUtils::GetKeyName(*key));
     }
-
+    
     if (ImGui::Button(buf)) {
         ImGui::OpenPopup(LOC("menu", "hotkey.SelectKey").c_str());
     }
@@ -427,32 +426,32 @@ bool ImGuiMenu::HotKey(const char* label, int* key) {
     // Modular window for choosing key
     if (ImGui::BeginPopupModal(LOC("menu", "hotkey.SelectKey").c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text(LOC("menu", "hotkey.Instructions").c_str());
-
+        
         // Check mouse input
         if (ImGui::IsMouseClicked(0)) {
-            *key = VK_LBUTTON;
-            changed = true;
-            ImGui::CloseCurrentPopup();
+             *key = VK_LBUTTON;
+             changed = true;
+             ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsMouseClicked(1)) {
-            *key = VK_RBUTTON;
-            changed = true;
-            ImGui::CloseCurrentPopup();
+             *key = VK_RBUTTON;
+             changed = true;
+             ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsMouseClicked(2)) {
-            *key = VK_MBUTTON;
-            changed = true;
-            ImGui::CloseCurrentPopup();
+             *key = VK_MBUTTON;
+             changed = true;
+             ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsMouseClicked(3)) {
-            *key = VK_XBUTTON1;
-            changed = true;
-            ImGui::CloseCurrentPopup();
+             *key = VK_XBUTTON1;
+             changed = true;
+             ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsMouseClicked(4)) {
-            *key = VK_XBUTTON2;
-            changed = true;
-            ImGui::CloseCurrentPopup();
+             *key = VK_XBUTTON2;
+             changed = true;
+             ImGui::CloseCurrentPopup();
         }
 
         // Check key input
@@ -864,7 +863,7 @@ void ImGuiMenu::RenderTraitESPTab() {
     ImGui::Checkbox(LOC("menu", "general.Enable").c_str(), &Configs.Traits.Enable);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "general.TextColor").c_str(), &Configs.Traits.TraitColor);
-
+    
     ImGui::Checkbox(LOC("menu", "general.Name").c_str(), &Configs.Traits.Name);
     ImGui::SameLine();
     ImGui::Checkbox(LOC("menu", "general.Distance").c_str(), &Configs.Traits.Distance);
@@ -1080,31 +1079,31 @@ void ImGuiMenu::RenderTraitESPTab() {
 
 void ImGuiMenu::RenderHotkeysTab() {
     ImGui::BeginChild("HotkeysTab", ImVec2(0, 0), false);
-
+    
     ImGui::Text(LOC("menu", "tabs.PlayerESP").c_str());
     ImGui::SameLine(180 * Configs.General.UIScale);
     HotKey("##PlayerToggle", &Configs.Player.ToggleKey);
-
+    
     ImGui::Text(LOC("menu", "tabs.BossesESP").c_str());
     ImGui::SameLine(180 * Configs.General.UIScale);
     HotKey("##BossesToggle", &Configs.Bosses.ToggleKey);
-
+    
     ImGui::Text(LOC("menu", "tabs.SupplyESP").c_str());
     ImGui::SameLine(180 * Configs.General.UIScale);
     HotKey("##SupplyToggle", &Configs.Supply.ToggleKey);
-
+    
     ImGui::Text(LOC("menu", "tabs.BBESP").c_str());
     ImGui::SameLine(180 * Configs.General.UIScale);
     HotKey("##BBToggle", &Configs.BloodBonds.ToggleKey);
-
+    
     ImGui::Text(LOC("menu", "tabs.TrapESP").c_str());
     ImGui::SameLine(180 * Configs.General.UIScale);
     HotKey("##TrapToggle", &Configs.Trap.ToggleKey);
-
+    
     ImGui::Text(LOC("menu", "tabs.POIESP").c_str());
     ImGui::SameLine(180 * Configs.General.UIScale);
     HotKey("##POIToggle", &Configs.POI.ToggleKey);
-
+    
     ImGui::Text(LOC("menu", "tabs.TraitESP").c_str());
     ImGui::SameLine(180 * Configs.General.UIScale);
     HotKey("##TraitToggle", &Configs.Traits.ToggleKey);
@@ -1117,14 +1116,14 @@ void ImGuiMenu::RenderOverlayTab() {
 
     ImGui::BeginGroup();
     ImGui::Text("Display Settings");
-
+    
     int prevMonitor = DisplayManager::GetCurrentMonitorIndex();
     int currentMonitor = prevMonitor;
     std::string monitorHeader = "Select Monitor";
     if (currentMonitor >= 0 && currentMonitor < DisplayManager::GetMonitorCount()) {
         monitorHeader = DisplayManager::GetMonitor(currentMonitor).name;
     }
-
+    
     if (ImGui::BeginCombo("Monitor", monitorHeader.c_str())) {
         for (int i = 0; i < DisplayManager::GetMonitorCount(); i++) {
             bool is_selected = (currentMonitor == i);
@@ -1135,14 +1134,14 @@ void ImGuiMenu::RenderOverlayTab() {
         }
         ImGui::EndCombo();
     }
-
+    
     if (currentMonitor != prevMonitor) {
         DisplayManager::SetCurrentMonitor(currentMonitor);
     }
-
+    
     int prevPreset = DisplayManager::GetCurrentResolutionPreset();
     int currentPreset = prevPreset;
-
+    
     if (ImGui::BeginCombo("Resolution Preset", DisplayManager::GetResolutionPresetName(currentPreset))) {
         for (int i = 0; i < DisplayManager::GetResolutionPresetCount(); i++) {
             bool is_selected = (currentPreset == i);
@@ -1153,7 +1152,7 @@ void ImGuiMenu::RenderOverlayTab() {
         }
         ImGui::EndCombo();
     }
-
+    
     if (currentPreset != prevPreset) {
         DisplayManager::ApplyResolutionPreset(currentPreset);
         HWND hWnd = (HWND)ImGui::GetMainViewport()->PlatformHandle;
@@ -1161,8 +1160,8 @@ void ImGuiMenu::RenderOverlayTab() {
             SetWindowPos(hWnd, nullptr, 0, 0, (int)DisplayManager::ScreenWidth, (int)DisplayManager::ScreenHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
         }
     }
-
-    if (currentPreset == 4)
+    
+    if (currentPreset == 4) 
     {
         float pWidth = DisplayManager::ScreenWidth;
         float pHeight = DisplayManager::ScreenHeight;
@@ -1177,7 +1176,7 @@ void ImGuiMenu::RenderOverlayTab() {
             }
         }
     }
-
+    
     ImGui::EndGroup();
 
     ImGui::Separator();
@@ -1191,7 +1190,7 @@ void ImGuiMenu::RenderOverlayTab() {
     ColorPickerWithText(LOC("menu", "overlay.PlayerColor").c_str(), &Configs.Overlay.PlayerRadarColor);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "overlay.EnemyColor").c_str(), &Configs.Overlay.EnemyRadarColor);
-
+    
     // Manual Adjustments
     SliderFloatWithInput(LOC("menu", "overlay.RadarScale").c_str(), &Configs.Overlay.RadarScale, 0.1f, 2.0f, "%.5f");
     SliderFloatWithInput(LOC("menu", "overlay.RadarX").c_str(), &Configs.Overlay.RadarX, -0.05f, 0.05f, "%.5f");
@@ -1330,13 +1329,12 @@ void ImGuiMenu::RenderAimbotTab() {
             }
         }
         ImGui::SameLine();
-
+        
         // Build port list for combo (first item is "Auto")
         std::string currentPortLabel = "Auto (scan all)";
         if (selectedPortIdx > 0 && selectedPortIdx <= (int)availablePorts.size()) {
             currentPortLabel = availablePorts[selectedPortIdx - 1].portName + " - " + availablePorts[selectedPortIdx - 1].description;
-        }
-        else if (!Configs.Aimbot.KmboxPort.empty()) {
+        } else if (!Configs.Aimbot.KmboxPort.empty()) {
             currentPortLabel = Configs.Aimbot.KmboxPort + " (saved)";
         }
 
@@ -1378,20 +1376,19 @@ void ImGuiMenu::RenderAimbotTab() {
 
     if (ImGui::Button("Connect")) {
         if (Configs.Aimbot.KmboxDeviceType == 3) {
-            kmbox::NetInitialize(Configs.Aimbot.KmboxIP, Configs.Aimbot.KmboxNetPort, Configs.Aimbot.KmboxUUID);
-        }
-        else {
-            kmbox::KmboxInitialize(Configs.Aimbot.KmboxPort, Configs.Aimbot.KmboxBaudRate, (kmbox::DeviceType)Configs.Aimbot.KmboxDeviceType);
+             kmbox::NetInitialize(Configs.Aimbot.KmboxIP, Configs.Aimbot.KmboxNetPort, Configs.Aimbot.KmboxUUID);
+        } else {
+             kmbox::KmboxInitialize(Configs.Aimbot.KmboxPort, Configs.Aimbot.KmboxBaudRate, (kmbox::DeviceType)Configs.Aimbot.KmboxDeviceType);
         }
     }
     ImGui::SameLine();
     if (kmbox::connected) {
         const char* detectedName = "Unknown";
         switch (kmbox::detectedDevice) {
-        case kmbox::DeviceType::Makcu: detectedName = "Makcu (4MHz)"; break;
-        case kmbox::DeviceType::StandardKmbox: detectedName = "Standard KMBox"; break;
-        case kmbox::DeviceType::KmboxNet: detectedName = "Kmbox Net"; break;
-        default: detectedName = "Connected"; break;
+            case kmbox::DeviceType::Makcu: detectedName = "Makcu (4MHz)"; break;
+            case kmbox::DeviceType::StandardKmbox: detectedName = "Standard KMBox"; break;
+            case kmbox::DeviceType::KmboxNet: detectedName = "Kmbox Net"; break;
+            default: detectedName = "Connected"; break;
         }
         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s on %s", detectedName, kmbox::connectedPort.c_str());
     }
@@ -1482,9 +1479,9 @@ void ImGuiMenu::RenderAimbotTab() {
                 if (i == 0)
                     snprintf(itemLabel, sizeof(itemLabel), "%s", WeaponPresets[i].name);
                 else
-                    snprintf(itemLabel, sizeof(itemLabel), "%s (%.0fm/s, DR%.0f)",
+                    snprintf(itemLabel, sizeof(itemLabel), "%s (%.0fm/s, DR%.0f)", 
                         WeaponPresets[i].name, WeaponPresets[i].bulletSpeed, WeaponPresets[i].dropRange);
-
+                
                 if (ImGui::Selectable(itemLabel, isSelected)) {
                     Configs.Aimbot.WeaponPreset = i;
                     if (i > 0) {
@@ -1716,7 +1713,7 @@ void ImGuiMenu::RenderSettingsTab() {
             ImGui::Text(LOC("menu", "settings.WriteEntitiesDumpInfo").c_str());
             ImGui::EndTooltip();
         }
-    }
+    }    
 
     ImGui::Separator();
 

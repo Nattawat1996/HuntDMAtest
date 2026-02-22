@@ -21,9 +21,9 @@ enum class e_registry_type
 
 inline const char* LPWSTR_TO_CC(LPWSTR in)
 {
-	char buffer[500];
-	wcstombs(buffer, in, 500);
-
+	static char buffer[500];
+	size_t converted = 0;
+	wcstombs_s(&converted, buffer, sizeof(buffer), in, _TRUNCATE);
 	return buffer;
 }
 
