@@ -11,11 +11,13 @@ public:
     }
     bool DrawRadar = true;
     bool RadarDrawSelf = false;
-    float RadarScale = 0.6493056f; // Default magic number
-    float RadarX = -0.001171875f;  // Default horizontal offset factor
-    float RadarY = 0.0090277f;     // Default vertical offset factor
+    float RadarScale = 0.6843056f; // 0.6493056 + 0.0350 (adjusted for recent UI update)
+    float RadarX = 0.000428125f;   // (0.001171875 - 0.0016) * -1 (adjusted for recent UI update)
+    float RadarY = -0.0104723f;    // 0.0090277 - 0.0195 (adjusted for recent UI update)
     ImVec4 PlayerRadarColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
     ImVec4 EnemyRadarColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+    ImVec4 DeadRadarColor = ImVec4(0.5f, 0.5f, 0.5f, 1.0f); // Gray for dead players
+    int RadarKey = VK_TAB; // Key to show radar
     bool ShowFPS = true;
     int FpsFontSize = 17;
     ImVec4 FpsColor = ImVec4(0.564705f, 0.564705f, 0.564705f, 1.0f);
@@ -61,6 +63,8 @@ public:
         j[ConfigName][LIT("CrosshairSize")] = CrosshairSize;
         ToJsonColor(&j, LIT("PlayerRadarColor"), &PlayerRadarColor);
         ToJsonColor(&j, LIT("EnemyRadarColor"), &EnemyRadarColor);
+        ToJsonColor(&j, LIT("DeadRadarColor"), &DeadRadarColor);
+        j[ConfigName][LIT("RadarKey")] = RadarKey;
         ToJsonColor(&j, LIT("CrosshairColor"), &CrosshairColor);
         ToJsonColor(&j, LIT("FpsColor"), &FpsColor);
         ToJsonColor(&j, LIT("ObjectCountColor"), &ObjectCountColor);
@@ -96,6 +100,9 @@ public:
             CrosshairSize = j[ConfigName][LIT("CrosshairSize")];
         FromJsonColor(j, LIT("PlayerRadarColor"), &PlayerRadarColor);
         FromJsonColor(j, LIT("EnemyRadarColor"), &EnemyRadarColor);
+        FromJsonColor(j, LIT("DeadRadarColor"), &DeadRadarColor);
+        if (j[ConfigName].contains(LIT("RadarKey")))
+            RadarKey = j[ConfigName][LIT("RadarKey")];
         FromJsonColor(j, LIT("CrosshairColor"), &CrosshairColor);
         FromJsonColor(j, LIT("FpsColor"), &FpsColor);
         FromJsonColor(j, LIT("ObjectCountColor"), &ObjectCountColor);

@@ -701,6 +701,20 @@ void ImGuiMenu::RenderPlayerESPTab() {
 
     ImGui::Checkbox(LOC("menu", "players.Snaplines").c_str(), &Configs.Player.Snaplines);
 
+    ImGui::Checkbox("Draw Bones (Skeleton)", &Configs.Player.DrawBones);
+    if (Configs.Player.DrawBones)
+    {
+        ImGui::SameLine();
+        ColorPickerWithText("Bones Color", &Configs.Player.BonesColor);
+    }
+
+    ImGui::Checkbox("Draw Friend Bones", &Configs.Player.DrawBonesFriend);
+    if (Configs.Player.DrawBonesFriend)
+    {
+        ImGui::SameLine();
+        ColorPickerWithText("Friend Bones Color", &Configs.Player.FriendBonesColor);
+    }
+
     ImGui::EndChild();
 }
 
@@ -1108,6 +1122,10 @@ void ImGuiMenu::RenderHotkeysTab() {
     ImGui::SameLine(180 * Configs.General.UIScale);
     HotKey("##TraitToggle", &Configs.Traits.ToggleKey);
 
+    ImGui::Text("Radar");
+    ImGui::SameLine(180 * Configs.General.UIScale);
+    HotKey("##RadarKey", &Configs.Overlay.RadarKey);
+
     ImGui::EndChild();
 }
 
@@ -1190,6 +1208,8 @@ void ImGuiMenu::RenderOverlayTab() {
     ColorPickerWithText(LOC("menu", "overlay.PlayerColor").c_str(), &Configs.Overlay.PlayerRadarColor);
     ImGui::SameLine();
     ColorPickerWithText(LOC("menu", "overlay.EnemyColor").c_str(), &Configs.Overlay.EnemyRadarColor);
+    ImGui::SameLine();
+    ColorPickerWithText("Dead Color", &Configs.Overlay.DeadRadarColor);
     
     // Manual Adjustments
     SliderFloatWithInput(LOC("menu", "overlay.RadarScale").c_str(), &Configs.Overlay.RadarScale, 0.1f, 2.0f, "%.5f");

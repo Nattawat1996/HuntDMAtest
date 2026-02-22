@@ -81,22 +81,27 @@ enum class EntityType : int
 	Event,
 	EventBoon,
 };
-struct Matrix4x4 {
-	float m[4][4];
+struct Matrix34 {
+	// CryEngine Matrix34: 3 rows × 4 cols (row-major)
+	// row0 = [m00 m01 m02 m03]  (X-axis + Tx)
+	// row1 = [m10 m11 m12 m13]  (Y-axis + Ty)
+	// row2 = [m20 m21 m22 m23]  (Z-axis + Tz)
+	float m[3][4];
 
-	Matrix4x4() {
-		memset(m, 0, sizeof(m));
-		m[0][0] = m[1][1] = m[2][2] = m[3][3] = 1.0f;
-	}
+	Matrix34() { memset(m, 0, sizeof(m)); }
 
-	Vector3 TransformPoint(const Vector3& point) const {
-		Vector3 result;
-		result.x = point.x * m[0][0] + point.y * m[1][0] + point.z * m[2][0] + m[3][0];
-		result.y = point.x * m[0][1] + point.y * m[1][1] + point.z * m[2][1] + m[3][1];
-		result.z = point.x * m[0][2] + point.y * m[1][2] + point.z * m[2][2] + m[3][2];
-		return result;
+	// Transform local bone offset → world space
+	Vector3 TransformPoint(const Vector3& p) const {
+		return Vector3(
+			m[0][0]*p.x + m[0][1]*p.y + m[0][2]*p.z + m[0][3],
+			m[1][0]*p.x + m[1][1]*p.y + m[1][2]*p.z + m[1][3],
+			m[2][0]*p.x + m[2][1]*p.y + m[2][2]*p.z + m[2][3]
+		);
 	}
 };
+
+// Keep Matrix4x4 alias for compatibility
+using Matrix4x4 = Matrix34;
 
 class WorldEntity
 {
@@ -140,17 +145,26 @@ private:
 	uint64_t HpPointer5 = 0x0;
 	HealthBar Health;
 
-	const uint64_t CharacterInstanceOffset = 0x88;
-	const uint64_t BoneArrayOffset = 0xD00;
-	const uint64_t SkeletonPoseOffset = 0x1260;
-	const uint64_t ModelJointsOffset = 0x8;
-	const uint64_t BoneArraySizeOffset = 0xA0;
-	const uint64_t BoneStructSize = 0x1C;
-	const uint64_t WorldMatrixOffset = 0x160;
+	const uint64_t CharacterInstanceOffset = 0x88;   // Slot -> CCharInstance*
+	const uint64_t SkeletonPoseOffset       = 0xC80;  // CCharInstance -> CSkeletonPose (inline)
+	const uint64_t BoneArrayBaseOffset      = 0x20;   // CSkeletonPose -> QuatT array base ptr
+	const uint64_t BoneArrayAlignOffset     = 0x38;   // CSkeletonPose -> QuatT array align ptr
+	const uint64_t DefaultSkeletonOffset    = 0x1C0;  // CCharInstance -> IDefaultSkeleton ptr
+	const uint64_t ModelJointsOffset        = 0x8;    // IDefaultSkeleton -> joint name array
+	const uint64_t BoneArraySizeOffset      = 0xA0;   // IDefaultSkeleton -> joint count
+	const uint64_t BoneStructSize           = 0x1C;   // sizeof(QuatT)
+	const uint64_t BonePosOffset            = 0x10;   // QuatT -> Vec3 position
+	const uint64_t WorldMatrixOffset        = 0x160;
 	static const int MAX_BONES = 15;
 	uint32_t BoneCount = 0;
 	int BoneIndex[MAX_BONES] = { 0 };
 	Vector3 HeadPosition;
+	Vector3 BonePositions[MAX_BONES];  // world-space positions, updated every frame
+	Vector3 LocalBonePositions[MAX_BONES];  // raw local-space from scatter, temp buffer
+	uint64_t HeadBonePtr = 0;  // cached ptr to head QuatT — valid after UpdateBones()
+	std::string DebugBoneNames;  // first few bone names from skeleton — for offset debugging
+	bool BonesMapped = false;    // true once UpdateBones() has built the bone index map
+	Matrix4x4 WorldMatrix;       // entity world transform — for bone local->world transform
 
 	const uint64_t InternalFlagsOffset = 0x8;
 	uint32_t InternalFlags = 0x0;
@@ -245,6 +259,8 @@ public:
 	void UpdateNode(VMMDLL_SCATTER_HANDLE handle);
 	void UpdateHealth(VMMDLL_SCATTER_HANDLE handle);
 	void UpdateBones();
+	void UpdateHeadPosition(VMMDLL_SCATTER_HANDLE handle); // fast scatter read of all bone positions
+	Vector3 GetBonePosition(int idx) const { return (idx >= 0 && idx < MAX_BONES) ? BonePositions[idx] : Vector3::Zero(); }
 	void UpdateVelocity(); // Compute velocity from position delta
 
 	// Velocity tracking for prediction (public for aimbot access)
@@ -263,11 +279,15 @@ public:
 	void SetValid(bool valid) { Valid = valid; }
 	std::string GetTypeAsString() { return Names[Type]; };
 	bool IsLocalPlayer();
-	Vector3 GetHeadPosition() const { return HeadPosition; }
+	Vector3 GetHeadPosition() const { return HeadBonePtr != 0 ? BonePositions[0] : HeadPosition; }
+	uint32_t GetBoneCount() const { return BoneCount; }
+	const std::string& GetDebugBoneNames() const { return DebugBoneNames; }
+	const Matrix4x4& GetWorldMatrix() const { return WorldMatrix; }
+	void ApplyBoneWorldTransform();  // call after ExecuteReadScatter to convert local→world
 
 	uint64_t SpecCountOffset1 = 0x198;
 	uint64_t SpecCountOffset2 = 0x20;
-	uint64_t SpecCountOffset3 = 0xd0;
+	uint64_t SpecCountOffset3 = 0xD0;
 	uint64_t SpecCountOffset4 = 0xE8;
 	uint64_t SpecCountOffset5 = 0x330;
 	uint64_t SpecCountPointer1 = 0x0;

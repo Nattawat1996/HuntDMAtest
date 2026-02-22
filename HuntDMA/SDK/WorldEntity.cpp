@@ -125,71 +125,145 @@ void WorldEntity::UpdateHealth(VMMDLL_SCATTER_HANDLE handle)
 	TargetProcess.AddScatterReadRequest(handle, HpPointer5, &Health, sizeof(HealthBar));
 }
 
-void WorldEntity::UpdateBones() // Currently doesn't work
+void WorldEntity::UpdateBones()
 {
-	// Get character instance pointer and bones
-	uint64_t charInstancePointer = TargetProcess.Read<uint64_t>(Slot + CharacterInstanceOffset);
-	if (!charInstancePointer) return;
+	// Once mapped, per-frame updates are handled by UpdateHeadPosition() scatter reads
+	// No need to re-read bones synchronously here
+	if (BonesMapped) return;
 
-	uint64_t bonePtr0 = TargetProcess.Read<uint64_t>(charInstancePointer + BoneArrayOffset + 0x20);
-	uint64_t bonePtr1 = TargetProcess.Read<uint64_t>(charInstancePointer + BoneArrayOffset + 0x38);
-	if (!bonePtr0 || !bonePtr1) return;
+	// ── Slow path (first time only): build bone name → index map ─────────────
+	BoneCount = 0;  // reset — used as debug step counter below
 
-	uint64_t boneArray = bonePtr0 + ((bonePtr1 + 3) & 0xFFFFFFFFFFFFFFFC);
-	uint64_t skeletonPose = TargetProcess.Read<uint64_t>(charInstancePointer + SkeletonPoseOffset); // problem here is a bit that it seems not all hunter skins have default skeleton pose anymore
-	if (!skeletonPose) return;
+	// CCharInstance*
+	uint64_t charInst = TargetProcess.Read<uint64_t>(Slot + CharacterInstanceOffset);
+	if (!charInst) { BoneCount = 100; return; }  // step 1 fail: Slot->charInst bad
 
-	// Read bone mapping
+	// CSkeletonPose is inline at CCharInstance + 0xC80
+	uint64_t skelPose = charInst + SkeletonPoseOffset;
+
+	// QuatT array: addr = ((alignPtr + 3) & ~3) + basePtr + boneId * 0x1C
+	uint64_t basePtr  = TargetProcess.Read<uint64_t>(skelPose + BoneArrayBaseOffset);
+	uint64_t alignPtr = TargetProcess.Read<uint64_t>(skelPose + BoneArrayAlignOffset);
+	if (!basePtr || !alignPtr) { BoneCount = 200; return; }  // step 2 fail: skelPose ptrs bad
+
+	uint64_t boneArray = ((alignPtr + 3) & ~3ULL) + basePtr;
+
+	// IDefaultSkeleton for bone name -> id lookup
+	uint64_t defaultSkeleton = TargetProcess.Read<uint64_t>(charInst + DefaultSkeletonOffset);
+	if (!defaultSkeleton) { BoneCount = 300; return; }  // step 3 fail: defaultSkeleton bad
+
+	uint64_t modelJoints  = TargetProcess.Read<uint64_t>(defaultSkeleton + ModelJointsOffset);
+	uint32_t jointCount   = TargetProcess.Read<uint32_t>(defaultSkeleton + BoneArraySizeOffset);
+	if (!modelJoints || jointCount == 0 || jointCount > 1024) { BoneCount = 400; return; }  // step 4 fail
+
+	BoneCount = jointCount;
+
+	// Build bone name -> index map
+	// Step 1: bulk-read entire joint pointer array (stride=0x38, namePtr at +0x00)
+	// → 1 DMA read instead of jointCount reads
+	std::vector<uint8_t> jointBuf(jointCount * 0x38);
+	TargetProcess.Read(modelJoints, jointBuf.data(), jointCount * 0x38);
+
+	// Step 2: extract namePtr for each joint, scatter-read all name strings at once
+	std::vector<uint64_t> namePtrs(jointCount);
+	for (uint32_t i = 0; i < jointCount; i++)
+		namePtrs[i] = *reinterpret_cast<uint64_t*>(jointBuf.data() + i * 0x38);
+
+	std::vector<EntityNameStruct> nameStructs(jointCount);
+	auto nameHandle = TargetProcess.CreateScatterHandle();
+	for (uint32_t i = 0; i < jointCount; i++)
+	{
+		if (namePtrs[i])
+			TargetProcess.AddScatterReadRequest(nameHandle, namePtrs[i], &nameStructs[i], sizeof(EntityNameStruct));
+	}
+	TargetProcess.ExecuteReadScatter(nameHandle);
+	TargetProcess.CloseScatterHandle(nameHandle);
+
+	// Step 3: build boneMap from scatter results
 	std::map<std::string, int> boneMap;
-	uint64_t modelJoints = TargetProcess.Read<uint64_t>(skeletonPose + ModelJointsOffset);
-	uint32_t boneArraySize = TargetProcess.Read<uint32_t>(skeletonPose + BoneArraySizeOffset);
-	BoneCount = boneArraySize;
-
-	// Cache all bone names and indices
-	for (uint32_t i = 0; i < boneArraySize; i++)
+	for (uint32_t i = 0; i < jointCount; i++)
 	{
-		auto boneName = TargetProcess.Read<EntityNameStruct>(modelJoints + (i * 0x38));
-		boneMap[std::string(boneName.name)] = i;
+		if (!namePtrs[i]) continue;
+		nameStructs[i].name[99] = '\0';
+		boneMap[std::string(nameStructs[i].name)] = (int)i;
 	}
 
-	if (!boneMap.empty())
-	{
-		// Map bone indices
-		const char* boneNames[] = {
-			"head", "neck", "pelvis", "R_upperarm", "R_forearm", "R_hand", "R_thigh", "R_calf", "R_foot", "L_upperarm", "L_forearm", "L_hand", "L_thigh", "L_calf", "L_foot"
-		};
+	if (boneMap.empty()) return;
 
-		for (int i = 0; i < MAX_BONES; i++) {
-			auto it = boneMap.find(boneNames[i]);
-			if (it != boneMap.end()) {
-				BoneIndex[i] = it->second;
+	// Map well-known bone names to indices
+	const char* boneNames[MAX_BONES] = {
+		"head", "neck", "pelvis",
+		"R_upperarm", "R_forearm", "R_hand", "R_thigh", "R_calf", "R_foot",
+		"L_upperarm", "L_forearm", "L_hand", "L_thigh", "L_calf", "L_foot"
+	};
+
+	for (int i = 0; i < MAX_BONES; i++)
+	{
+		auto it = boneMap.find(boneNames[i]);
+		BoneIndex[i] = (it != boneMap.end()) ? it->second : -1;
+	}
+
+	// Cache bone array base and read initial positions for all found bones
+	WorldMatrix = TargetProcess.Read<Matrix34>(Class + WorldMatrixOffset);
+	if (BoneIndex[0] >= 0)
+	{
+		HeadBonePtr = boneArray + (uint64_t)BoneIndex[0] * BoneStructSize;
+		for (int i = 0; i < MAX_BONES; i++)
+		{
+			if (BoneIndex[i] >= 0)
+			{
+				Vector3 local = TargetProcess.Read<Vector3>(boneArray + (uint64_t)BoneIndex[i] * BoneStructSize + BonePosOffset);
+				LocalBonePositions[i] = local;
+				BonePositions[i] = WorldMatrix.TransformPoint(local);
 			}
+			else
+				BonePositions[i] = Vector3::Zero();
 		}
-
-		// Read head bone position if available
-		if (BoneIndex[0] != 0) {
-			// Read bone transform
-			Vector4 boneRotation;
-			Vector3 bonePosition;
-
-			// Read bone quaternion and position
-			boneRotation = TargetProcess.Read<Vector4>(boneArray + (BoneIndex[0] * BoneStructSize));
-
-			// Read world matrix
-			Matrix4x4 worldMatrix;
-			worldMatrix = TargetProcess.Read<Matrix4x4>(Class + WorldMatrixOffset);
-
-			// Calculate head position after scatter read completes
-			// Note: The actual calculation will be done after ExecuteReadScatter
-			Vector3 localHeadPos = Vector4::Mult(boneRotation, Vector3(0, 0, 0));
-			HeadPosition = worldMatrix.TransformPoint(localHeadPos);
-			LOG_INFO("Headpos:[%f,%f,%f]", HeadPosition.x, HeadPosition.y, HeadPosition.z);
-			HeadPosition = Position;
-			HeadPosition.z = HeadPosition.z + 1.7f;
-			LOG_INFO("FIXED Headpos:[%f,%f,%f]", HeadPosition.x, HeadPosition.y, HeadPosition.z);
-			LOG_INFO("================");
-		}
+		HeadPosition = BonePositions[0];
 	}
+	else
+	{
+		HeadBonePtr = 0;
+		HeadPosition = Position;
+		HeadPosition.z += 1.7f;
+		for (int i = 0; i < MAX_BONES; i++)
+			BonePositions[i] = Vector3::Zero();
+	}
+
+	BonesMapped = true;  // mark done — future calls skip the name lookup
+}
+
+
+void WorldEntity::UpdateHeadPosition(VMMDLL_SCATTER_HANDLE handle)
+{
+	if (HeadBonePtr != 0)
+	{
+		uint64_t boneArray = HeadBonePtr - (uint64_t)BoneIndex[0] * BoneStructSize;
+		for (int i = 0; i < MAX_BONES; i++)
+		{
+			if (BoneIndex[i] >= 0)
+				TargetProcess.AddScatterReadRequest(handle, boneArray + (uint64_t)BoneIndex[i] * BoneStructSize + BonePosOffset, &LocalBonePositions[i], sizeof(Vector3));
+		}
+		// Also read WorldMatrix every frame so rotation tracks player turning
+		TargetProcess.AddScatterReadRequest(handle, Class + WorldMatrixOffset, &WorldMatrix, sizeof(Matrix34));
+	}
+	else
+	{
+		HeadPosition = Position;
+		HeadPosition.z += 1.7f;
+	}
+}
+
+// Call AFTER ExecuteReadScatter — LocalBonePositions[] are local, apply WorldMatrix to get world-space
+void WorldEntity::ApplyBoneWorldTransform()
+{
+	if (HeadBonePtr == 0) return;
+	for (int i = 0; i < MAX_BONES; i++)
+	{
+		if (BoneIndex[i] >= 0)
+			BonePositions[i] = WorldMatrix.TransformPoint(LocalBonePositions[i]);
+	}
+	HeadPosition = BonePositions[0];
 }
 
 void WorldEntity::UpdateExtraction(VMMDLL_SCATTER_HANDLE handle)

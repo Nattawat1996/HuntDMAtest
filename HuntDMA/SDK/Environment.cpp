@@ -174,14 +174,24 @@ void Environment::UpdatePlayerList()
 		ent->UpdateHealth(handle);
 		ent->UpdateClass(handle);
 		ent->UpdateExtraction(handle);
+		ent->UpdateHeadPosition(handle);
 
 	}
 	Configs.Player.Chams = false;
 	TargetProcess.ExecuteReadScatter(handle);
 	TargetProcess.ExecuteWriteScatter(writehandle);
 
+	// Apply WorldMatrix to convert scatter-read local bone positions → world space
+	for (size_t index = 0; index < templist.size(); ++index)
+	{
+		std::shared_ptr<WorldEntity> ent = templist[index];
+		if (ent == nullptr) continue;
+		ent->ApplyBoneWorldTransform();
+	}
+
 	TargetProcess.CloseScatterHandle(handle);
 	TargetProcess.CloseScatterHandle(writehandle);
+
 
 	bool spectatorCountChanged = false;
 	for (size_t index = 0; index < templist.size(); ++index)
@@ -197,7 +207,6 @@ void Environment::UpdatePlayerList()
 		}
 
 		ent->SetHidden((ent->GetInternalFlags() & WorldEntity::HIDDEN_FLAG) == WorldEntity::HIDDEN_FLAG); // If player has extracted
-		//ent->UpdateBones();
 	}
 	if (!spectatorCountChanged)
 		SpectatorCount = 0;
@@ -780,6 +789,15 @@ void Environment::CacheEntities()
 		}
 	}
 
+	// Read bone skeleton once per entity discovery (expensive sync reads — not per frame)
+	for (std::shared_ptr<WorldEntity> ent : templayerlist)
+	{
+		if (ent == nullptr) continue;
+		if (ent->GetType() == EntityType::LocalPlayer) continue;
+		if (ent->GetType() == EntityType::DeadPlayer) continue;
+		ent->UpdateBones();
+	}
+
 	for (std::shared_ptr<WorldEntity> ent : templayerlist)
 	{
 		if (ent == nullptr)
@@ -788,6 +806,7 @@ void Environment::CacheEntities()
 	}
 	TargetProcess.ExecuteReadScatter(handle);
 	TargetProcess.CloseScatterHandle(handle);
+
 
 	std::swap(PlayerList, templayerlist);
 	std::swap(BossesList, tempbosseslist);

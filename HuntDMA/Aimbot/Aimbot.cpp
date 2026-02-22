@@ -33,8 +33,7 @@ static Vector2 GetHeadScreenPosition(std::shared_ptr<WorldEntity> entity)
 	if (!entity || !CameraInstance)
 		return Vector2::Zero();
 
-	Vector3 headPos = entity->GetPosition();
-	headPos.z += 1.7f;
+	Vector3 headPos = entity->GetHeadPosition();  // uses bone head if available
 
 	Vector2 screenPos = CameraInstance->WorldToScreen(headPos);
 	screenPos.x += Configs.Player.HeadCircleOffsetX;
@@ -93,8 +92,7 @@ static Vector2 GetPredictedHeadScreenPosition(std::shared_ptr<WorldEntity> entit
 	if (!entity || !CameraInstance)
 		return Vector2::Zero();
 
-	Vector3 headPos = entity->GetPosition();
-	headPos.z += 1.7f;
+	Vector3 headPos = entity->GetHeadPosition();  // uses bone head if available
 
 	if (Configs.Aimbot.Prediction)
 	{

@@ -127,7 +127,7 @@ void DrawRadar() {
   // RYANS RADAR
   if (!Configs.Overlay.DrawRadar)
     return;
-  if (!Keyboard::IsKeyDown(VK_TAB))
+  if (!Keyboard::IsKeyDown(Configs.Overlay.RadarKey))
     return;
 
   const auto &tempPlayerList = EnvironmentInstance->GetPlayerList();
@@ -198,12 +198,18 @@ void DrawRadar() {
   // Draw Enemies
   for (const auto &ent : tempPlayerList) {
     if (!ent || ent->GetType() == EntityType::LocalPlayer ||
-        ent->GetType() == EntityType::FriendlyPlayer ||
-        ent->GetType() == EntityType::DeadPlayer)
+        ent->GetType() == EntityType::FriendlyPlayer)
       continue;
 
     if (!ent->GetValid() || ent->IsHidden())
       continue;
+
+    ImVec4 dotColor;
+    if (ent->GetType() == EntityType::DeadPlayer) {
+      dotColor = Configs.Overlay.DeadRadarColor;
+    } else {
+      dotColor = Configs.Overlay.EnemyRadarColor;
+    }
 
     float enemyMapX =
         ((ent->GetPosition().x - worldMinX) / (worldMaxX - worldMinX)) *
@@ -217,7 +223,7 @@ void DrawRadar() {
     float enemyScreenY =
         mapCenterY - (MapSize / 2) + enemyMapY + verticaloffset;
 
-    // Check if out of bounds (OPTIONAL: Clamp or Skip)
+    // Skip if out of bounds
     if (enemyScreenX < mapCenterX - MapSize / 2 + horizontaloffset ||
         enemyScreenX > mapCenterX + MapSize / 2 + horizontaloffset ||
         enemyScreenY < mapCenterY - MapSize / 2 + verticaloffset ||
@@ -226,7 +232,7 @@ void DrawRadar() {
     }
 
     ESPRenderer::DrawCircle(ImVec2(enemyScreenX, enemyScreenY), 5.0f,
-                            Configs.Overlay.EnemyRadarColor, 1.0f, true);
+                            dotColor, 1.0f, true);
   }
 }
 

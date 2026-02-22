@@ -120,7 +120,7 @@ void DrawPlayersEsp() {
 
       auto playerPos = ent->GetPosition();
 
-      if (!Configs.Player.DrawFriendsHP &&
+      if (!Configs.Player.DrawFriendsHP && !Configs.Player.DrawBonesFriend &&
           ent->GetType() == EntityType::FriendlyPlayer)
         continue;
 
@@ -361,6 +361,32 @@ void DrawPlayersEsp() {
             ImVec4(0.784313f, 0.784313f, 0.784313f, 1.0f), lineHeight);
       }
 
+      // ── Skeleton ESP ──────────────────────────────────────────────────────
+      bool isFriend = (ent->GetType() == EntityType::FriendlyPlayer);
+      bool drawBonesNow = (!isFriend && Configs.Player.DrawBones && !isDead)
+                       || (isFriend  && Configs.Player.DrawBonesFriend);
+      if (drawBonesNow)
+      {
+        static const int connections[][2] = {
+          {0, 1}, {1, 2},           // head-neck-pelvis (spine)
+          {1, 3}, {3, 4}, {4, 5},   // R arm
+          {1, 9}, {9,10},{10,11},   // L arm
+          {2, 6}, {6, 7}, {7, 8},   // R leg
+          {2,12},{12,13},{13,14},   // L leg
+        };
+        auto boneColour = isFriend ? Configs.Player.FriendBonesColor : Configs.Player.BonesColor;
+        for (auto& c : connections)
+        {
+          Vector3 a = ent->GetBonePosition(c[0]);
+          Vector3 b = ent->GetBonePosition(c[1]);
+          if (a.IsZero() || b.IsZero()) continue;
+          Vector2 sa = CameraInstance->WorldToScreen(a, false);
+          Vector2 sb = CameraInstance->WorldToScreen(b, false);
+          if (sa.IsZero() || sb.IsZero()) continue;
+          ESPRenderer::DrawLine(ImVec2(sa.x, sa.y), ImVec2(sb.x, sb.y), boneColour, 1.0f);
+        }
+      }
+
       if (!Configs.Player.Enable ||
           ent->GetType() == EntityType::FriendlyPlayer)
         continue;
@@ -385,6 +411,7 @@ void DrawPlayersEsp() {
                                 ? Configs.Player.FriendColor
                                 : Configs.Player.TextColor,
                             Configs.Player.FontSize, TopCenter);
+
     }
   }
 }
