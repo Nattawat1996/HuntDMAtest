@@ -154,3 +154,26 @@ int DisplayManager::GetMonitorY()
 
 	return m_Monitors[m_CurrentMonitor].y;
 }
+
+int DisplayManager::GetRecommendedEspSyncHz()
+{
+    // Query the current monitor's actual refresh rate from Windows.
+    if (m_CurrentMonitor >= 0 && m_CurrentMonitor < static_cast<int>(m_Monitors.size()))
+    {
+        MONITORINFOEX mi = {};
+        mi.cbSize = sizeof(MONITORINFOEX);
+        if (GetMonitorInfo(m_Monitors[m_CurrentMonitor].hMonitor, &mi))
+        {
+            DEVMODE dm = {};
+            dm.dmSize = sizeof(DEVMODE);
+            if (EnumDisplaySettings(mi.szDevice, ENUM_CURRENT_SETTINGS, &dm) && dm.dmDisplayFrequency > 0)
+            {
+                int hz = static_cast<int>(dm.dmDisplayFrequency);
+                if (hz < 30)  hz = 30;
+                if (hz > 360) hz = 360;
+                return hz;
+            }
+        }
+    }
+    return 60; // Safe fallback
+}

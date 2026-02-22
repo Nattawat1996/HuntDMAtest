@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.h"
+#include <algorithm>
 class GeneralConfig
 {
     std::string ConfigName;
@@ -15,6 +16,11 @@ public:
     bool OverlayMode = false;
     bool PreventRecording = false;
     bool CrosshairLowerPosition = false;
+    bool AutoEspSyncHz = true;
+    int EspSyncHz = 120;
+    bool OverlayVSync = false;
+    int OverlayVSyncHz = 120;
+    int CacheLevel = 1; // 0=Low, 1=Default, 2=High, 3=VeryHigh
     float UIScale = (float)GetDpiForSystem() / (float)USER_DEFAULT_SCREEN_DPI;
     int OpenMenuKey = 36;
     bool CloseMenuOnEsc = true;
@@ -48,6 +54,11 @@ public:
         j[ConfigName][LIT("OverlayMode")] = OverlayMode;
         j[ConfigName][LIT("PreventRecording")] = PreventRecording;
         j[ConfigName][LIT("CrosshairLowerPosition")] = CrosshairLowerPosition;
+        j[ConfigName][LIT("AutoEspSyncHz")] = AutoEspSyncHz;
+        j[ConfigName][LIT("EspSyncHz")] = EspSyncHz;
+        j[ConfigName][LIT("OverlayVSync")] = OverlayVSync;
+        j[ConfigName][LIT("OverlayVSyncHz")] = OverlayVSyncHz;
+        j[ConfigName][LIT("CacheLevel")] = CacheLevel;
         j[ConfigName][LIT("UIScale")] = UIScale;
         j[ConfigName][LIT("OpenMenuKey")] = OpenMenuKey;
         j[ConfigName][LIT("CloseMenuOnEsc")] = CloseMenuOnEsc;
@@ -72,8 +83,22 @@ public:
             PreventRecording = j[ConfigName][LIT("PreventRecording")];
         if (j[ConfigName].contains(LIT("CrosshairLowerPosition")))
             CrosshairLowerPosition = j[ConfigName][LIT("CrosshairLowerPosition")];
+        if (j[ConfigName].contains(LIT("AutoEspSyncHz")))
+            AutoEspSyncHz = j[ConfigName][LIT("AutoEspSyncHz")];
+        if (j[ConfigName].contains(LIT("EspSyncHz")))
+            EspSyncHz = j[ConfigName][LIT("EspSyncHz")];
+        EspSyncHz = std::clamp(EspSyncHz, 30, 300);
+        if (j[ConfigName].contains(LIT("OverlayVSync")))
+            OverlayVSync = j[ConfigName][LIT("OverlayVSync")];
+        if (j[ConfigName].contains(LIT("OverlayVSyncHz")))
+            OverlayVSyncHz = j[ConfigName][LIT("OverlayVSyncHz")];
+        OverlayVSyncHz = std::clamp(OverlayVSyncHz, 30, 360);
+        if (j[ConfigName].contains(LIT("CacheLevel")))
+            CacheLevel = j[ConfigName][LIT("CacheLevel")];
+        CacheLevel = std::clamp(CacheLevel, 0, 3);
         if (j[ConfigName].contains(LIT("UIScale")))
             UIScale = j[ConfigName][LIT("UIScale")];
+        UIScale = std::clamp(UIScale, 0.70f, 2.00f);
         if (j[ConfigName].contains(LIT("OpenMenuKey")))
             OpenMenuKey = j[ConfigName][LIT("OpenMenuKey")];
         if (j[ConfigName].contains(LIT("CloseMenuOnEsc")))
@@ -82,4 +107,3 @@ public:
             Language = j[ConfigName][LIT("Language")];
     }
 };
-

@@ -28,6 +28,9 @@ public:
 	static int GetMonitorX();
 	static int GetMonitorY();
 
+	// Returns the ideal ESP refresh rate based on current display Hz (clamped 30-360).
+	static int GetRecommendedEspSyncHz();
+
 	// Resolution presets
 	static void ApplyResolutionPreset(int presetIndex);
 	static const char* GetResolutionPresetName(int index);
