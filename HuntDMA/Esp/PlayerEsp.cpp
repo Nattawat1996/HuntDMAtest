@@ -83,7 +83,7 @@ void DrawPlayersEsp() {
   if (EnvironmentInstance->GetObjectCount() < 10)
     return;
 
-  if (Configs.Player.Enable || Configs.Player.DrawFrames ||
+  if (Configs.Player.Enable || Configs.Player.BoxStyle > 0 ||
       Configs.Player.Snaplines) {
     const auto &templist = EnvironmentInstance->GetPlayerList();
     if (templist.empty())
@@ -177,18 +177,17 @@ void DrawPlayersEsp() {
 
       tempPos.z = playerPos.z + 1.7f;
       Vector2 headPos;
-      if (Configs.Player.DrawHeadInFrames || Configs.Player.Snaplines) {
+      if (Configs.Player.Snaplines) {
         headPos = CameraInstance->WorldToScreen(tempPos, false);
         if (headPos.IsZero())
           continue;
       }
 
       tempPos.z = playerPos.z + 2.0f;
-      Vector2 uppderFramePos;
-      if ((Configs.Player.DrawFrames || Configs.Player.DrawHealthBars ||
-           Configs.Player.DrawHeadInFrames)) {
-        uppderFramePos = CameraInstance->WorldToScreen(tempPos, false);
-        if (uppderFramePos.IsZero())
+      Vector2 upperFramePos;
+      if (Configs.Player.BoxStyle > 0 || Configs.Player.DrawHealthBars) {
+        upperFramePos = CameraInstance->WorldToScreen(tempPos, false);
+        if (upperFramePos.IsZero())
           continue;
       }
 
@@ -209,19 +208,17 @@ void DrawPlayersEsp() {
       }
 
       Vector2 offset, normal;
-      if ((Configs.Player.DrawFrames || Configs.Player.DrawHealthBars ||
-           Configs.Player.DrawHeadInFrames)) {
-        Vector2 v = uppderFramePos - feetPos;
-        float segmentLength = Vector2::Length(v);
+      if (Configs.Player.BoxStyle > 0 || Configs.Player.DrawHealthBars) {
+        Vector2 v = upperFramePos - feetPos;
         normal = Vector2(-v.y, v.x);
         offset = normal / (2.0f * 2);
       }
 
-      if (Configs.Player.DrawFrames &&
+      // ── Box ESP ────────────────────────────────────────────────────────
+      if (Configs.Player.BoxStyle > 0 &&
           ent->GetType() != EntityType::FriendlyPlayer && !isDead) {
-        // Determine top position based on state (Alive = 2.0m, Dead/Loot
-        // = 1.85m)
-        Vector2 topPos = uppderFramePos;
+
+        Vector2 topPos = upperFramePos;
         if (isDead) {
           auto tempPosTop = playerPos;
           tempPosTop.z = playerPos.z + 1.85f;
@@ -230,86 +227,73 @@ void DrawPlayersEsp() {
 
         if (!topPos.IsZero()) {
           Vector2 v = topPos - feetPos;
-          float segmentLength = Vector2::Length(v);
-          Vector2 normal = Vector2(-v.y, v.x);
-          Vector2 offset = normal / (2.0f * 2);
+          Vector2 norm = Vector2(-v.y, v.x);
+          Vector2 off  = norm / (2.0f * 2);
 
-          Vector2 A1 = feetPos + offset; // Bottom-left
-          Vector2 A2 = feetPos - offset; // Bottom-right
-          Vector2 B1 = topPos + offset;  // Top-left
-          Vector2 B2 = topPos - offset;  // Top-right
+          Vector2 A1 = feetPos + off;  // Bottom-left
+          Vector2 A2 = feetPos - off;  // Bottom-right
+          Vector2 B1 = topPos  + off;  // Top-left
+          Vector2 B2 = topPos  - off;  // Top-right
 
           auto colour = ent->GetType() == EntityType::FriendlyPlayer
                             ? Configs.Player.FriendColor
                             : Configs.Player.FramesColor;
 
-          // Corner bracket length (20% of box dimensions)
-          // float cornerLength = segmentLength * 0.2f; // Unused variable
-          // warning fix float cornerWidth = Vector2::Distance(A1, A2) * 0.2f;
+          if (Configs.Player.BoxStyle == 1) {
+            // ── Style 1: Corner brackets (L-shapes at 4 corners, 20%) ──
+            float cx = 0.2f;
 
-          // Bottom-left corner (L-shape)
-          Vector2 BL_horizontal =
-              Vector2(A1.x + (A2.x - A1.x) * 0.2f, A1.y + (A2.y - A1.y) * 0.2f);
-          Vector2 BL_vertical =
-              Vector2(A1.x + (B1.x - A1.x) * 0.2f, A1.y + (B1.y - A1.y) * 0.2f);
-          ESPRenderer::DrawLine(ImVec2(A1.x, A1.y),
-                                ImVec2(BL_horizontal.x, BL_horizontal.y),
-                                colour, 1.5f);
-          ESPRenderer::DrawLine(ImVec2(A1.x, A1.y),
-                                ImVec2(BL_vertical.x, BL_vertical.y), colour,
-                                1.5f);
+            // BL
+            ESPRenderer::DrawLine(ImVec2(A1.x, A1.y),
+              ImVec2(A1.x + (A2.x - A1.x) * cx, A1.y + (A2.y - A1.y) * cx), colour, 1.5f);
+            ESPRenderer::DrawLine(ImVec2(A1.x, A1.y),
+              ImVec2(A1.x + (B1.x - A1.x) * cx, A1.y + (B1.y - A1.y) * cx), colour, 1.5f);
+            // BR
+            ESPRenderer::DrawLine(ImVec2(A2.x, A2.y),
+              ImVec2(A2.x + (A1.x - A2.x) * cx, A2.y + (A1.y - A2.y) * cx), colour, 1.5f);
+            ESPRenderer::DrawLine(ImVec2(A2.x, A2.y),
+              ImVec2(A2.x + (B2.x - A2.x) * cx, A2.y + (B2.y - A2.y) * cx), colour, 1.5f);
+            // TL
+            ESPRenderer::DrawLine(ImVec2(B1.x, B1.y),
+              ImVec2(B1.x + (B2.x - B1.x) * cx, B1.y + (B2.y - B1.y) * cx), colour, 1.5f);
+            ESPRenderer::DrawLine(ImVec2(B1.x, B1.y),
+              ImVec2(B1.x + (A1.x - B1.x) * cx, B1.y + (A1.y - B1.y) * cx), colour, 1.5f);
+            // TR
+            ESPRenderer::DrawLine(ImVec2(B2.x, B2.y),
+              ImVec2(B2.x + (B1.x - B2.x) * cx, B2.y + (B1.y - B2.y) * cx), colour, 1.5f);
+            ESPRenderer::DrawLine(ImVec2(B2.x, B2.y),
+              ImVec2(B2.x + (A2.x - B2.x) * cx, B2.y + (A2.y - B2.y) * cx), colour, 1.5f);
+          } else if (Configs.Player.BoxStyle == 2) {
+            // ── Style 2: Full box (4 full sides) ──
+            ESPRenderer::DrawLine(ImVec2(A1.x, A1.y), ImVec2(A2.x, A2.y), colour, 1.5f); // bottom
+            ESPRenderer::DrawLine(ImVec2(B1.x, B1.y), ImVec2(B2.x, B2.y), colour, 1.5f); // top
+            ESPRenderer::DrawLine(ImVec2(A1.x, A1.y), ImVec2(B1.x, B1.y), colour, 1.5f); // left
+            ESPRenderer::DrawLine(ImVec2(A2.x, A2.y), ImVec2(B2.x, B2.y), colour, 1.5f); // right
+          }
+        }
+      }
 
-          // Bottom-right corner
-          Vector2 BR_horizontal =
-              Vector2(A2.x + (A1.x - A2.x) * 0.2f, A2.y + (A1.y - A2.y) * 0.2f);
-          Vector2 BR_vertical =
-              Vector2(A2.x + (B2.x - A2.x) * 0.2f, A2.y + (B2.y - A2.y) * 0.2f);
-          ESPRenderer::DrawLine(ImVec2(A2.x, A2.y),
-                                ImVec2(BR_horizontal.x, BR_horizontal.y),
-                                colour, 1.5f);
-          ESPRenderer::DrawLine(ImVec2(A2.x, A2.y),
-                                ImVec2(BR_vertical.x, BR_vertical.y), colour,
-                                1.5f);
+      // ── Head Bone Dot ─────────────────────────────────────────────────
+      if (Configs.Player.DrawHeadCircle &&
+          ent->GetType() != EntityType::FriendlyPlayer && !isDead) {
+        Vector3 headBone = ent->GetHeadPosition(); // head centre (+0.12 m offset applied)
+        if (!headBone.IsZero()) {
+          Vector2 headScreen = CameraInstance->WorldToScreen(headBone, false);
+          if (!headScreen.IsZero()) {
+            // Project a point 0.12m away in world space to derive screen radius.
+            // This makes the dot scale with distance exactly like bone lines do.
+            Vector3 edgePoint = Vector3(headBone.x, headBone.y + 0.12f, headBone.z);
+            Vector2 edgeScreen = CameraInstance->WorldToScreen(edgePoint, false);
+            float radius = (!edgeScreen.IsZero())
+                ? std::max(1.0f, Vector2::Distance(headScreen, edgeScreen))
+                : std::max(1.0f, 500.0f / std::max(1.0f, (float)distance));
 
-          // Top-left corner
-          Vector2 TL_horizontal =
-              Vector2(B1.x + (B2.x - B1.x) * 0.2f, B1.y + (B2.y - B1.y) * 0.2f);
-          Vector2 TL_vertical =
-              Vector2(B1.x + (A1.x - B1.x) * 0.2f, B1.y + (A1.y - B1.y) * 0.2f);
-          ESPRenderer::DrawLine(ImVec2(B1.x, B1.y),
-                                ImVec2(TL_horizontal.x, TL_horizontal.y),
-                                colour, 1.5f);
-          ESPRenderer::DrawLine(ImVec2(B1.x, B1.y),
-                                ImVec2(TL_vertical.x, TL_vertical.y), colour,
-                                1.5f);
-
-          // Top-right corner
-          Vector2 TR_horizontal =
-              Vector2(B2.x + (B1.x - B2.x) * 0.2f, B2.y + (B1.y - B2.y) * 0.2f);
-          Vector2 TR_vertical =
-              Vector2(B2.x + (A2.x - B2.x) * 0.2f, B2.y + (A2.y - B2.y) * 0.2f);
-          ESPRenderer::DrawLine(ImVec2(B2.x, B2.y),
-                                ImVec2(TR_horizontal.x, TR_horizontal.y),
-                                colour, 1.5f);
-          ESPRenderer::DrawLine(ImVec2(B2.x, B2.y),
-                                ImVec2(TR_vertical.x, TR_vertical.y), colour,
-                                1.5f);
-
-          if (Configs.Player.DrawHeadInFrames) {
-            // Calculate radius based on the frame width
-            float headRadius =
-                Vector2::Distance(headPos + offset, headPos - offset) /
-                Configs.Player.HeadCircleSize;
-
-            // Apply offsets to head position
-            Vector2 adjustedHeadPos =
-                Vector2(headPos.x + Configs.Player.HeadCircleOffsetX,
-                        headPos.y + Configs.Player.HeadCircleOffsetY);
-
-            // Draw circle around head
+            auto colour = ent->GetType() == EntityType::FriendlyPlayer
+                              ? Configs.Player.FriendColor
+                              : Configs.Player.FramesColor;
             ESPRenderer::DrawCircle(
-                ImVec2(adjustedHeadPos.x, adjustedHeadPos.y), headRadius,
-                colour, 1.5f, false);
+                ImVec2(headScreen.x, headScreen.y),
+                radius, colour, 1.5f, true);
           }
         }
       }

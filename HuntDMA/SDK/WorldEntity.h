@@ -279,7 +279,16 @@ public:
 	void SetValid(bool valid) { Valid = valid; }
 	std::string GetTypeAsString() { return Names[Type]; };
 	bool IsLocalPlayer();
-	Vector3 GetHeadPosition() const { return HeadBonePtr != 0 ? BonePositions[0] : HeadPosition; }
+	// Bone 0 is at the skull base (top of neck joint).
+	// Adding +0.12 m in Z shifts to the geometric centre of the head,
+	// which is the correct aim point for both ESP and aimbot.
+	static constexpr float HEAD_CENTER_OFFSET_Z = 0.08f;
+	Vector3 GetHeadPosition() const
+	{
+		Vector3 base = (HeadBonePtr != 0) ? BonePositions[0] : HeadPosition;
+		base.z += HEAD_CENTER_OFFSET_Z;
+		return base;
+	}
 	uint32_t GetBoneCount() const { return BoneCount; }
 	const std::string& GetDebugBoneNames() const { return DebugBoneNames; }
 	const Matrix4x4& GetWorldMatrix() const { return WorldMatrix; }

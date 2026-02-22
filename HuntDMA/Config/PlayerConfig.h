@@ -21,8 +21,8 @@ public:
     bool HP = true;
     bool DrawFriendsHP = false;
     bool ShowDead = false;
-    bool DrawFrames = true;
-    bool DrawHeadInFrames = true;
+    int BoxStyle = 1;  // 0=Off, 1=Corners, 2=Full Box
+    bool DrawHeadCircle = true;  // Draw head circle using bone position
     float HeadCircleSize = 2.5f;
     float HeadCircleOffsetX = 0.0f;
     float HeadCircleOffsetY = 0.0f;
@@ -72,8 +72,8 @@ public:
         j[ConfigName][LIT("HP")] = HP;
         j[ConfigName][LIT("DrawFriends")] = DrawFriendsHP;
         j[ConfigName][LIT("ShowDead")] = ShowDead;
-        j[ConfigName][LIT("DrawFrames")] = DrawFrames;
-        j[ConfigName][LIT("DrawHeadInFrames")] = DrawHeadInFrames;
+        j[ConfigName][LIT("BoxStyle")] = BoxStyle;
+        j[ConfigName][LIT("DrawHeadCircle")] = DrawHeadCircle;
         j[ConfigName][LIT("HeadCircleSize")] = HeadCircleSize;
         j[ConfigName][LIT("HeadCircleOffsetX")] = HeadCircleOffsetX;
         j[ConfigName][LIT("HeadCircleOffsetY")] = HeadCircleOffsetY;
@@ -109,8 +109,21 @@ public:
             MaxDistance = j[ConfigName][LIT("MaxDistance")];
         if (j[ConfigName].contains(LIT("DeadMaxDistance")))
             DeadMaxDistance = j[ConfigName][LIT("DeadMaxDistance")];
+        // Backward compat: old bool DrawFrames → BoxStyle
         if (j[ConfigName].contains(LIT("DrawFrames")))
-            DrawFrames = j[ConfigName][LIT("DrawFrames")];
+            BoxStyle = j[ConfigName][LIT("DrawFrames")].get<bool>() ? 1 : 0;
+        if (j[ConfigName].contains(LIT("BoxStyle")))
+            BoxStyle = j[ConfigName][LIT("BoxStyle")];
+        if (j[ConfigName].contains(LIT("DrawHeadInFrames")))
+            DrawHeadCircle = j[ConfigName][LIT("DrawHeadInFrames")];
+        if (j[ConfigName].contains(LIT("DrawHeadCircle")))
+            DrawHeadCircle = j[ConfigName][LIT("DrawHeadCircle")];
+        if (j[ConfigName].contains(LIT("HeadCircleSize")))
+            HeadCircleSize = j[ConfigName][LIT("HeadCircleSize")];
+        if (j[ConfigName].contains(LIT("HeadCircleOffsetX")))
+            HeadCircleOffsetX = j[ConfigName][LIT("HeadCircleOffsetX")];
+        if (j[ConfigName].contains(LIT("HeadCircleOffsetY")))
+            HeadCircleOffsetY = j[ConfigName][LIT("HeadCircleOffsetY")];
         if (j[ConfigName].contains(LIT("Chams")))
             Chams = j[ConfigName][LIT("Chams")];
         if (j[ConfigName].contains(LIT("ChamMode")))
@@ -121,14 +134,6 @@ public:
             DrawFriendsHP = j[ConfigName][LIT("DrawFriends")];
         if (j[ConfigName].contains(LIT("ShowDead")))
             ShowDead = j[ConfigName][LIT("ShowDead")];
-        if (j[ConfigName].contains(LIT("DrawHeadInFrames")))
-            DrawHeadInFrames = j[ConfigName][LIT("DrawHeadInFrames")];
-        if (j[ConfigName].contains(LIT("HeadCircleSize")))
-            HeadCircleSize = j[ConfigName][LIT("HeadCircleSize")];
-        if (j[ConfigName].contains(LIT("HeadCircleOffsetX")))
-            HeadCircleOffsetX = j[ConfigName][LIT("HeadCircleOffsetX")];
-        if (j[ConfigName].contains(LIT("HeadCircleOffsetY")))
-            HeadCircleOffsetY = j[ConfigName][LIT("HeadCircleOffsetY")];
         if (j[ConfigName].contains(LIT("DrawHealthBars")))
             DrawHealthBars = j[ConfigName][LIT("DrawHealthBars")];
         if (j[ConfigName].contains(LIT("Snaplines")))
@@ -150,6 +155,7 @@ public:
             DrawBones = j[ConfigName][LIT("DrawBones")];
         if (j[ConfigName].contains(LIT("DrawBonesFriend")))
             DrawBonesFriend = j[ConfigName][LIT("DrawBonesFriend")];
+
     }
 };
 

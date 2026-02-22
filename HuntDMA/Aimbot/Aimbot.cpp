@@ -36,8 +36,6 @@ static Vector2 GetHeadScreenPosition(std::shared_ptr<WorldEntity> entity)
 	Vector3 headPos = entity->GetHeadPosition();  // uses bone head if available
 
 	Vector2 screenPos = CameraInstance->WorldToScreen(headPos);
-	screenPos.x += Configs.Player.HeadCircleOffsetX;
-	screenPos.y += Configs.Player.HeadCircleOffsetY;
 	return screenPos;
 }
 
@@ -129,8 +127,6 @@ static Vector2 GetPredictedHeadScreenPosition(std::shared_ptr<WorldEntity> entit
 
 
 	Vector2 screenPos = CameraInstance->WorldToScreen(headPos);
-	screenPos.x += Configs.Player.HeadCircleOffsetX;
-	screenPos.y += Configs.Player.HeadCircleOffsetY;
 	return screenPos;
 }
 

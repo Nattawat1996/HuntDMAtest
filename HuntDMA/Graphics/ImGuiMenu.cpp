@@ -309,12 +309,16 @@ void ImGuiMenu::EndFrame() {
 
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    UINT syncInterval = 0; // Disables V-Sync for immediate presentation
-    UINT presentFlags = DXGI_PRESENT_DO_NOT_WAIT;
-    if (!Configs.General.OverlayMode)
-        presentFlags |= DXGI_PRESENT_ALLOW_TEARING;
+    HRESULT hr;
+    if (Configs.General.OverlayMode) {
+        // Overlay: sync to display (vsync = 1) — eliminates flicker caused by
+        // presenting faster than the compositor can composite the transparent window.
+        hr = swapChain->Present(1, 0);
+    } else {
+        // Standalone window: zero-latency + tearing allowed for maximum throughput.
+        hr = swapChain->Present(0, DXGI_PRESENT_DO_NOT_WAIT | DXGI_PRESENT_ALLOW_TEARING);
+    }
 
-    HRESULT hr = swapChain->Present(syncInterval, presentFlags);
 
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET) {
         CleanupDeviceD3D();
@@ -681,22 +685,29 @@ void ImGuiMenu::RenderPlayerESPTab() {
 
     ImGui::Separator();
 
-    ImGui::Checkbox(LOC("menu", "players.DrawFrames").c_str(), &Configs.Player.DrawFrames);
-    ImGui::SameLine();
-    ColorPickerWithText(LOC("menu", "players.FramesColor").c_str(), &Configs.Player.FramesColor);
-
-    if (Configs.Player.DrawFrames)
+    // ── Box Style ─────────────────────────────────────────────────────────
     {
-        ImGui::Checkbox(LOC("menu", "players.DrawHead").c_str(), &Configs.Player.DrawHeadInFrames);
-        if (Configs.Player.DrawHeadInFrames)
-        {
-            ImGui::SliderFloat(LOC("menu", "players.HeadCircleSize").c_str(), &Configs.Player.HeadCircleSize, 1.0f, 10.0f, "%.1f");
-            ImGui::SliderFloat(LOC("menu", "players.HeadCircleOffsetX").c_str(), &Configs.Player.HeadCircleOffsetX, -50.0f, 50.0f, "%.1f");
-            ImGui::SliderFloat(LOC("menu", "players.HeadCircleOffsetY").c_str(), &Configs.Player.HeadCircleOffsetY, -50.0f, 50.0f, "%.1f");
+        static const char* boxStyles[] = { "Off", "Corners", "Full Box" };
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::BeginCombo(LOC("menu", "players.DrawFrames").c_str(), boxStyles[Configs.Player.BoxStyle])) {
+            for (int n = 0; n < 3; n++) {
+                bool is_selected = (Configs.Player.BoxStyle == n);
+                if (ImGui::Selectable(boxStyles[n], is_selected))
+                    Configs.Player.BoxStyle = n;
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
         }
+        ImGui::SameLine();
+        ColorPickerWithText(LOC("menu", "players.FramesColor").c_str(), &Configs.Player.FramesColor);
     }
 
-    if (Configs.Player.Enable || Configs.Player.DrawFrames)
+    // ── Head Circle (bone-based) ──────────────────────────────────────────
+    ImGui::Checkbox(LOC("menu", "players.DrawHead").c_str(), &Configs.Player.DrawHeadCircle);
+
+    if (Configs.Player.Enable || Configs.Player.BoxStyle > 0)
+
         ImGui::Checkbox(LOC("menu", "players.DrawHealth").c_str(), &Configs.Player.DrawHealthBars);
 
     ImGui::Checkbox(LOC("menu", "players.Snaplines").c_str(), &Configs.Player.Snaplines);
